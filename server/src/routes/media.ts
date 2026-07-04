@@ -8,6 +8,7 @@ import { fetchJfArtwork } from '../jellyfin/client.js';
 import { fetchArtwork } from '../plex/client.js';
 import { pickRandomMedia } from '../randomizer/service.js';
 import { getPlexConfig, getSetting } from '../settings.js';
+import { dedupeMedia } from '../sources/dedupe.js';
 
 export const randomFiltersSchema = z.object({
   type: z.enum(['movie', 'show']).optional(),
@@ -61,7 +62,7 @@ export async function mediaRoutes(app: FastifyInstance) {
       .orderBy(sort === 'random' ? sql`random()` : asc(media.title))
       .limit(60)
       .all();
-    return rows.map(serializeMedia);
+    return dedupeMedia(rows).map(serializeMedia);
   });
 
   // Filter options for the randomizer: library sections, genres, and Plex collections.

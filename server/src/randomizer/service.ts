@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { and, eq, gte, like, lte, type SQL } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { collectionItems, listItems, media } from '../db/schema.js';
+import { dedupeMedia } from '../sources/dedupe.js';
 import { watchedSetForUser } from '../watchwith/service.js';
 
 export interface RandomFilters {
@@ -55,6 +56,9 @@ export async function pickRandomMedia(
   } else {
     rows = db.select().from(media).where(where).all();
   }
+
+  // Cross-source duplicates would double-weight the draw — collapse them first.
+  rows = dedupeMedia(rows);
 
   if (filters.unwatchedOnly) {
     const { set } = await watchedSetForUser(userId);

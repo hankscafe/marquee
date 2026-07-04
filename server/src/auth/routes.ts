@@ -6,7 +6,15 @@ import { getOidcConfiguration, getOidcSettings, oidcRedirectUri } from './oidc.j
 import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { authenticateJf, getJfConfig } from '../jellyfin/client.js';
-import { buildAuthUrl, checkLoginPin, createLoginPin, getPlexAccount, hasServerAccess } from '../plex/plextv.js';
+import {
+  buildAuthUrl,
+  checkLoginPin,
+  createLoginPin,
+  getHomeUsers,
+  getPlexAccount,
+  hasServerAccess,
+  switchToHomeUser,
+} from '../plex/plextv.js';
 import { getPlexConfig } from '../settings.js';
 import { hashPassword, verifyPassword } from './passwords.js';
 import { createSession, destroySession } from './plugin.js';
@@ -246,25 +254,73 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Your Plex account does not have access to this Plex server' });
     }
 
-    const plexId = String(account.id);
-    let user = db.select().from(users).where(eq(users.plexId, plexId)).get();
-    if (user) {
-      db.update(users).set({ plexToken: token, avatar: account.thumb }).where(eq(users.id, user.id)).run();
-    } else {
-      // Plex usernames may collide with existing local accounts — pick a free variant.
-      let username = account.username;
-      let suffix = 1;
-      while (db.select({ id: users.id }).from(users).where(eq(users.username, username)).get()) {
-        username = `${account.username}-${++suffix}`;
-      }
-      user = db
-        .insert(users)
-        .values({ username, passwordHash: null, plexId, plexToken: token, avatar: account.thumb })
-        .returning()
-        .get();
-    }
-
+    const user = upsertPlexUser(account, token);
     await createSession(reply, user.id);
     return { user: { id: user.id, username: user.username, isAdmin: user.isAdmin } };
   });
+
+  // Plex Home: list household members so they can pick their name on the login page.
+  app.get('/api/auth/plexhome/users', async (_request, reply) => {
+    if (userCount() === 0) return reply.code(400).send({ error: 'Complete first-run setup first' });
+    const cfg = getPlexConfig();
+    if (!cfg) return reply.code(503).send({ error: 'Plex is not configured on this server' });
+    try {
+      const list = await getHomeUsers(cfg.token);
+      return list.map((u) => ({ id: u.id, title: u.title, protected: !!u.protected, restricted: !!u.restricted }));
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not reach plex.tv' });
+    }
+  });
+
+  // Plex Home: switch to the chosen member (with their PIN if set) and sign them in.
+  app.post('/api/auth/plexhome/login', async (request, reply) => {
+    if (userCount() === 0) return reply.code(400).send({ error: 'Complete first-run setup first' });
+    const parsed = z.object({ homeUserId: z.number().int(), pin: z.string().max(10).optional() }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
+    const cfg = getPlexConfig();
+    if (!cfg) return reply.code(503).send({ error: 'Plex is not configured on this server' });
+
+    let token: string;
+    try {
+      token = await switchToHomeUser(cfg.token, parsed.data.homeUserId, parsed.data.pin);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Switch failed';
+      if (message === 'INVALID_PIN') return reply.code(401).send({ error: 'Incorrect PIN' });
+      return reply.code(502).send({ error: message });
+    }
+
+    let account;
+    try {
+      account = await getPlexAccount(token);
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not reach plex.tv' });
+    }
+    const user = upsertPlexUser(account, token);
+    await createSession(reply, user.id);
+    return { user: { id: user.id, username: user.username, isAdmin: user.isAdmin } };
+  });
+}
+
+// Find-or-create the Marquee account for a plex.tv identity (regular or managed).
+function upsertPlexUser(
+  account: { id: number; username: string; thumb: string | null },
+  token: string,
+): typeof users.$inferSelect {
+  const plexId = String(account.id);
+  const existing = db.select().from(users).where(eq(users.plexId, plexId)).get();
+  if (existing) {
+    db.update(users).set({ plexToken: token, avatar: account.thumb }).where(eq(users.id, existing.id)).run();
+    return existing;
+  }
+  // Plex usernames may collide with existing local accounts — pick a free variant.
+  let username = account.username;
+  let suffix = 1;
+  while (db.select({ id: users.id }).from(users).where(eq(users.username, username)).get()) {
+    username = `${account.username}-${++suffix}`;
+  }
+  return db
+    .insert(users)
+    .values({ username, passwordHash: null, plexId, plexToken: token, avatar: account.thumb })
+    .returning()
+    .get();
 }

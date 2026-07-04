@@ -229,6 +229,13 @@ export interface PlexTestResult {
   sections: { title: string; type: string }[];
 }
 
+export interface PlexHomeUserInfo {
+  id: number;
+  title: string;
+  protected: boolean;
+  restricted: boolean;
+}
+
 export interface PasskeyInfo {
   id: number;
   name: string;

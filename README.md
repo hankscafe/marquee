@@ -18,7 +18,7 @@ Self-hosted movie night polls and randomizer for your Plex server. Build a poll 
 
 **Media sources**
 - [x] Jellyfin and Emby support alongside Plex — sync, posters, box sets, watch status, deep links; any combination of the three can be configured at once
-- [ ] De-duplicate titles that exist on more than one configured server
+- [x] Cross-source de-duplication — titles on multiple servers appear once (matched by TMDb/IMDb id; watched on any copy counts)
 - [ ] Poll options sourced from server collections
 
 **Discovery & metadata**
@@ -32,7 +32,7 @@ Self-hosted movie night polls and randomizer for your Plex server. Build a poll 
 
 **Watching together**
 - [x] Watch With — "neither of us has seen it" library mode (per-person history via Trakt → own Plex account → sync account) and plex.tv watchlist-intersection mode, with one-click requests for overlap titles missing from the library
-- [ ] Watch With: partner-without-an-account (plex.tv friends' watchlists)
+- [ ] Watch With: partner-without-an-account — deferred: needs plex.tv's undocumented community GraphQL API, which changes without notice
 - [x] Cinema Poster Mode — fullscreen `/poster` display: live "Now Playing" (all sources) with progress bar, pause state, end time, and viewer; rotating library posters when idle
 - [ ] Device control — power on Apple TV / TV devices and open the pick in the selected service
 
@@ -43,14 +43,14 @@ Self-hosted movie night polls and randomizer for your Plex server. Build a poll 
 **Auth**
 - [x] Sign in with Plex (PIN/OAuth flow; only accounts with access to the configured server may join)
 - [x] Jellyfin / Emby account login (username/password against the configured server)
-- [ ] Plex Managed Users (Plex Home) login
+- [x] Plex Managed Users — household sign-in with member tiles and optional PIN
 - [x] OIDC login (Authentik / Authelia / Keycloak / any compliant provider) — authorization-code flow with PKCE, admin-configurable, custom button label
 - [x] Passkeys (WebAuthn) — register from the Account page, usernameless sign-in from the login page; requires HTTPS (or localhost)
 
 **Platform**
 - [x] PWA install on mobile and desktop
 - [x] Scheduled/recurring randomizer picks — weekly or one-shot, saved with the randomizer's current filters, optional Discord announcement, run-now/pause/delete controls
-- [ ] PNG PWA icons (current icon is SVG-only)
+- [x] PNG PWA icons (192/512/maskable + apple-touch-icon)
 
 ## Stack
 

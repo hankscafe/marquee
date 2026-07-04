@@ -6,6 +6,7 @@ import { db } from '../db/index.js';
 import { media, users } from '../db/schema.js';
 import { requireUser } from '../auth/plugin.js';
 import { getSeerrConfig } from '../seerr/client.js';
+import { dedupeMedia } from '../sources/dedupe.js';
 import { fetchWatchlist, watchedSetForUser, watchlistKey } from '../watchwith/service.js';
 import { serializeMedia } from './media.js';
 
@@ -37,11 +38,13 @@ export async function watchWithRoutes(app: FastifyInstance) {
       watchedSetForUser(partner.id),
     ]);
 
-    const rows = db
-      .select()
-      .from(media)
-      .where(parsed.data.type ? eq(media.type, parsed.data.type) : undefined)
-      .all();
+    const rows = dedupeMedia(
+      db
+        .select()
+        .from(media)
+        .where(parsed.data.type ? eq(media.type, parsed.data.type) : undefined)
+        .all(),
+    );
     const pool = rows.filter((r) => !mine.set.has(r.id) && !theirs.set.has(r.id));
     if (!pool.length) {
       return reply.code(404).send({ error: 'No titles left that neither of you has seen — impressive. Try widening the filter.' });
