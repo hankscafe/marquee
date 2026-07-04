@@ -229,6 +229,13 @@ export interface PlexTestResult {
   sections: { title: string; type: string }[];
 }
 
+export interface PasskeyInfo {
+  id: number;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 export interface RandomFilters {
   type?: MediaType;
   genre?: string;

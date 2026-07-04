@@ -19,6 +19,23 @@ export const users = sqliteTable('users', {
     .$defaultFn(() => new Date()),
 });
 
+// WebAuthn credentials ("passkeys") registered by users.
+export const passkeys = sqliteTable('passkeys', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  credentialId: text('credential_id').notNull().unique(), // base64url
+  publicKey: text('public_key').notNull(), // base64url
+  counter: integer('counter').notNull().default(0),
+  transports: text('transports'), // JSON array
+  name: text('name').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  lastUsedAt: integer('last_used_at', { mode: 'timestamp' }),
+});
+
 export const sessions = sqliteTable('sessions', {
   token: text('token').primaryKey(),
   userId: integer('user_id')

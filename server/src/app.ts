@@ -15,6 +15,7 @@ import { requestRoutes } from './routes/requests.js';
 import { listRoutes } from './routes/lists.js';
 import { mediaRoutes } from './routes/media.js';
 import { nowPlayingRoutes } from './routes/nowplaying.js';
+import { passkeyRoutes } from './routes/passkeys.js';
 import { pollRoutes } from './routes/polls.js';
 import { scheduleRoutes } from './routes/schedules.js';
 import { traktRoutes } from './routes/trakt.js';
@@ -26,6 +27,7 @@ export async function buildApp() {
   await app.register(fastifyCookie, { secret: config.sessionSecret });
   await app.register(authPlugin);
   await app.register(authRoutes);
+  await app.register(passkeyRoutes);
   await app.register(pollRoutes);
   await app.register(mediaRoutes);
   await app.register(listRoutes);

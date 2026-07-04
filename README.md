@@ -45,7 +45,7 @@ Self-hosted movie night polls and randomizer for your Plex server. Build a poll 
 - [x] Jellyfin / Emby account login (username/password against the configured server)
 - [ ] Plex Managed Users (Plex Home) login
 - [x] OIDC login (Authentik / Authelia / Keycloak / any compliant provider) — authorization-code flow with PKCE, admin-configurable, custom button label
-- [ ] Passkey support for local accounts
+- [x] Passkeys (WebAuthn) — register from the Account page, usernameless sign-in from the login page; requires HTTPS (or localhost)
 
 **Platform**
 - [x] PWA install on mobile and desktop

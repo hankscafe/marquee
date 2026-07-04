@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { startAuthentication } from '@simplewebauthn/browser';
 import { api, ApiError } from '../api';
 import { useAuth } from '../auth';
 
@@ -63,6 +64,25 @@ export function Login() {
       clearTimeout(timer);
     };
   }, [plexPinId, navigate, queryClient]);
+
+  const passkeyLogin = useMutation({
+    mutationFn: async () => {
+      const options = await api<Parameters<typeof startAuthentication>[0]['optionsJSON']>(
+        '/api/auth/passkey/options',
+        { body: {} },
+      );
+      const response = await startAuthentication({ optionsJSON: options });
+      return api('/api/auth/passkey/verify', { body: response });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['auth'] });
+      navigate('/');
+    },
+    onError: (err) => {
+      if (err instanceof Error && err.name === 'NotAllowedError') return; // user dismissed the prompt
+      setError(err instanceof ApiError ? err.message : 'Passkey sign-in failed');
+    },
+  });
 
   const startPlexLogin = async () => {
     setError(null);
@@ -179,13 +199,22 @@ export function Login() {
           </button>
           {!data?.needsSetup && (
             <>
-              {(data?.authMethods?.plex || data?.authMethods?.oidc) && (
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-gold-500/15" />
-                  <span className="text-xs tracking-widest text-stone-500 uppercase">or</span>
-                  <div className="h-px flex-1 bg-gold-500/15" />
-                </div>
-              )}
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-gold-500/15" />
+                <span className="text-xs tracking-widest text-stone-500 uppercase">or</span>
+                <div className="h-px flex-1 bg-gold-500/15" />
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost w-full"
+                onClick={() => {
+                  setError(null);
+                  passkeyLogin.mutate();
+                }}
+                disabled={passkeyLogin.isPending}
+              >
+                🔑 Sign in with a passkey
+              </button>
               {data?.authMethods?.oidc && (
                 <button
                   type="button"

@@ -1,5 +1,5 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useAuth, useLogout } from '../auth';
+import { Link, NavLink, Outlet } from 'react-router-dom';
+import { useAuth } from '../auth';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-lg px-3 py-2 text-sm transition-colors ${
@@ -8,8 +8,6 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 export function Layout() {
   const { data } = useAuth();
-  const logout = useLogout();
-  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen">
@@ -45,13 +43,9 @@ export function Layout() {
                 Admin
               </NavLink>
             )}
-            <button
-              className="rounded-lg px-3 py-2 text-sm text-stone-400 hover:text-gold-300"
-              onClick={() => logout.mutate(undefined, { onSuccess: () => navigate('/login') })}
-              title={`Signed in as ${data?.user?.username}`}
-            >
-              Sign out
-            </button>
+            <NavLink to="/account" className={navLinkClass} title="Account & sign out">
+              {data?.user?.username ?? 'Account'}
+            </NavLink>
           </nav>
         </div>
       </header>

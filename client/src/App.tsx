@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { RequireAuth } from './auth';
 import { Layout } from './components/Layout';
+import { Account } from './pages/Account';
 import { Admin } from './pages/Admin';
 import { Collections } from './pages/Collections';
 import { Home } from './pages/Home';
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/collections" element={<Collections />} />
         <Route path="/lists" element={<Lists />} />
         <Route path="/report" element={<ReportIssue />} />
+        <Route path="/account" element={<Account />} />
         <Route path="/admin" element={<Admin />} />
       </Route>
     </Routes>
