@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { MediaItem, PollDetail } from '@marquee/shared';
+import type { MediaFilters, MediaItem, PollDetail } from '@marquee/shared';
 import { api, ApiError } from '../api';
 import { Poster } from '../components/Poster';
 
@@ -16,11 +16,22 @@ export function NewPoll() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const [sectionFilter, setSectionFilter] = useState('');
+  const [genreFilter, setGenreFilter] = useState('');
+  const { data: libraryFilters } = useQuery({
+    queryKey: ['media-filters'],
+    queryFn: () => api<MediaFilters>('/api/media/filters'),
+  });
+
   // With no search term, show a random sample of the library instead of A-to-Z.
   const { data: results, refetch } = useQuery({
-    queryKey: ['media', query],
+    queryKey: ['media', query, sectionFilter, genreFilter],
     queryFn: () =>
-      api<MediaItem[]>(`/api/media?q=${encodeURIComponent(query)}${query ? '' : '&sort=random'}`),
+      api<MediaItem[]>(
+        `/api/media?q=${encodeURIComponent(query)}${query ? '' : '&sort=random'}` +
+          (sectionFilter ? `&section=${encodeURIComponent(sectionFilter)}` : '') +
+          (genreFilter ? `&genre=${encodeURIComponent(genreFilter)}` : ''),
+      ),
   });
 
   const create = useMutation({
@@ -48,7 +59,7 @@ export function NewPoll() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl text-gold-300">New poll</h1>
+      <h1 className="font-display text-2xl text-neon-300">New poll</h1>
 
       <div className="card space-y-4 p-5">
         <input className="input" placeholder="Poll title, e.g. Friday Movie Night" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -60,7 +71,7 @@ export function NewPoll() {
         />
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-stone-300">
-            <input type="checkbox" checked={openNow} onChange={(e) => setOpenNow(e.target.checked)} className="accent-gold-400" />
+            <input type="checkbox" checked={openNow} onChange={(e) => setOpenNow(e.target.checked)} className="accent-neon-400" />
             Open voting immediately
           </label>
           <label className="flex items-center gap-2 text-sm text-stone-300">
@@ -73,11 +84,11 @@ export function NewPoll() {
             />
           </label>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-gold-500/10 pt-4">
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-neon-500/10 pt-4">
           {error && <p className="text-sm text-crimson-500">{error}</p>}
           {selected.length < 2 && <p className="text-sm text-stone-500">Pick at least 2 titles below</p>}
           <button
-            className="btn btn-gold"
+            className="btn btn-neon"
             disabled={create.isPending || !title.trim() || selected.length < 2}
             onClick={() => {
               setError(null);
@@ -91,13 +102,13 @@ export function NewPoll() {
 
       {selected.length > 0 && (
         <div className="card p-5">
-          <h2 className="mb-3 text-xs font-semibold tracking-widest text-gold-500 uppercase">
+          <h2 className="mb-3 text-xs font-semibold tracking-widest text-neon-500 uppercase">
             Selected ({selected.length}) — tap to remove
           </h2>
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6">
             {selected.map((m) => (
               <button key={m.id} onClick={() => toggle(m)} className="group text-left" title="Remove">
-                <Poster mediaId={m.id} title={m.title} className="rounded-lg ring-2 ring-gold-400 group-hover:opacity-60" />
+                <Poster mediaId={m.id} title={m.title} className="rounded-lg ring-2 ring-neon-400 group-hover:opacity-60" />
                 <p className="mt-1 truncate text-xs text-stone-300">{m.title}</p>
               </button>
             ))}
@@ -106,9 +117,30 @@ export function NewPoll() {
       )}
 
       <div className="card p-5">
-        <h2 className="mb-3 text-xs font-semibold tracking-widest text-gold-500 uppercase">Add from your library</h2>
-        <div className="flex gap-2">
-          <input className="input" placeholder="Search movies & shows…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <h2 className="mb-3 text-xs font-semibold tracking-widest text-neon-500 uppercase">Add from your library</h2>
+        <div className="flex flex-wrap gap-2">
+          <input
+            className="input min-w-40 flex-1"
+            placeholder="Search movies & shows…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <select className="input w-auto" value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)}>
+            <option value="">All libraries</option>
+            {libraryFilters?.sections.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <select className="input w-auto" value={genreFilter} onChange={(e) => setGenreFilter(e.target.value)}>
+            <option value="">All genres</option>
+            {libraryFilters?.genres.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
           {!query && (
             <button className="btn btn-ghost shrink-0" onClick={() => refetch()} title="Show a different random sample">
               🎲 Shuffle
@@ -124,7 +156,7 @@ export function NewPoll() {
                 <Poster
                   mediaId={m.id}
                   title={m.title}
-                  className={`rounded-lg transition-opacity ${isSelected ? 'ring-2 ring-gold-400' : 'hover:opacity-80'}`}
+                  className={`rounded-lg transition-opacity ${isSelected ? 'ring-2 ring-neon-400' : 'hover:opacity-80'}`}
                 />
                 <p className="mt-1 truncate text-xs text-stone-300">
                   {m.title} {m.year ? `(${m.year})` : ''}

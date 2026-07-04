@@ -74,9 +74,25 @@ export interface PollSummary {
   status: PollStatus;
   shareToken: string;
   isOwner: boolean;
+  pinned: boolean;
+  winnerOptionId: number | null;
+  options: PollOptionResult[];
   optionCount: number;
   voteCount: number;
   closesAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminUserInfo {
+  id: number;
+  username: string;
+  isAdmin: boolean;
+  hasPassword: boolean;
+  plex: boolean;
+  jellyfin: boolean;
+  emby: boolean;
+  discord: boolean;
+  oidc: boolean;
   createdAt: string;
 }
 
@@ -90,6 +106,7 @@ export interface PollDetail {
   closesAt: string | null;
   winnerOptionId: number | null;
   discordPosted: boolean;
+  pinned: boolean;
   isOwner: boolean;
   myVoteOptionId: number | null;
   totalVotes: number;

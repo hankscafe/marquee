@@ -1,5 +1,6 @@
-import type { FastifyInstance } from 'fastify';
-import { and, asc, eq, like, sql, type SQL } from 'drizzle-orm';
+import crypto from 'node:crypto';
+import type { FastifyInstance, FastifyReply } from 'fastify';
+import { and, asc, eq, isNotNull, like, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { collectionItems, collections, media } from '../db/schema.js';
@@ -51,10 +52,18 @@ export function serializeMedia(row: typeof media.$inferSelect) {
 
 export async function mediaRoutes(app: FastifyInstance) {
   app.get('/api/media', { preHandler: requireUser }, async (request) => {
-    const { q, type, sort } = request.query as { q?: string; type?: string; sort?: string };
+    const { q, type, sort, section, genre } = request.query as {
+      q?: string;
+      type?: string;
+      sort?: string;
+      section?: string;
+      genre?: string;
+    };
     const conditions: SQL[] = [];
     if (q) conditions.push(like(media.title, `%${q}%`));
     if (type === 'movie' || type === 'show') conditions.push(eq(media.type, type));
+    if (section) conditions.push(eq(media.librarySection, section));
+    if (genre) conditions.push(like(media.genres, `%"${genre}"%`));
     const rows = db
       .select()
       .from(media)
@@ -120,11 +129,12 @@ export async function mediaRoutes(app: FastifyInstance) {
   });
 
   // Poster proxy: streams artwork from the source server so tokens/keys stay server-side.
-  app.get('/api/media/:id/poster', { preHandler: requireUser }, async (request, reply) => {
-    const id = Number((request.params as { id: string }).id);
-    const item = db.select().from(media).where(eq(media.id, id)).get();
-    if (!item?.thumb) return reply.code(404).send({ error: 'No poster available' });
-
+  async function streamPoster(
+    item: { source: 'plex' | 'jellyfin' | 'emby'; thumb: string | null },
+    reply: FastifyReply,
+    cacheControl: string,
+  ) {
+    if (!item.thumb) return reply.code(404).send({ error: 'No poster available' });
     let res: Response;
     if (item.source === 'plex') {
       const cfg = getPlexConfig();
@@ -139,7 +149,26 @@ export async function mediaRoutes(app: FastifyInstance) {
     }
     if (!res.ok) return reply.code(502).send({ error: 'Failed to fetch poster from the media server' });
     reply.header('content-type', res.headers.get('content-type') ?? 'image/jpeg');
-    reply.header('cache-control', 'private, max-age=86400');
+    reply.header('cache-control', cacheControl);
     return reply.send(Buffer.from(await res.arrayBuffer()));
+  }
+
+  app.get('/api/media/:id/poster', { preHandler: requireUser }, async (request, reply) => {
+    const id = Number((request.params as { id: string }).id);
+    const item = db.select().from(media).where(eq(media.id, id)).get();
+    if (!item) return reply.code(404).send({ error: 'No poster available' });
+    return streamPoster(item, reply, 'private, max-age=86400');
+  });
+
+  // Unauthenticated: a random poster for the login-page backdrop. Streams
+  // artwork only — no titles or metadata leave the server.
+  app.get('/api/backdrop', async (_request, reply) => {
+    const rows = db
+      .select({ source: media.source, thumb: media.thumb })
+      .from(media)
+      .where(isNotNull(media.thumb))
+      .all();
+    if (!rows.length) return reply.code(404).send({ error: 'No artwork yet' });
+    return streamPoster(rows[crypto.randomInt(rows.length)]!, reply, 'no-store');
   });
 }

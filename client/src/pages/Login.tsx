@@ -155,15 +155,33 @@ export function Login() {
   const [heading, subheading] = headings[activeMode];
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-sm">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
+      {/* Poster-collage backdrop: artwork only, streamed unauthenticated. */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div className="grid -translate-x-6 -translate-y-10 rotate-[-4deg] scale-110 grid-cols-4 gap-2 opacity-25 sm:grid-cols-6 lg:grid-cols-8">
+          {Array.from({ length: 24 }).map((_, i) => (
+            <img
+              key={i}
+              src={`/api/backdrop?i=${i}`}
+              alt=""
+              loading="lazy"
+              className="aspect-[2/3] w-full rounded object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.visibility = 'hidden';
+              }}
+            />
+          ))}
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-ink-950/60 via-ink-950/75 to-ink-950" />
+      </div>
+      <div className="relative w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="marquee-title text-3xl sm:text-4xl">★ MARQUEE ★</div>
           <div className="mt-2 text-sm tracking-widest text-stone-500 uppercase">Movie night, decided together</div>
         </div>
-        <form onSubmit={onSubmit} className="card space-y-4 p-6">
+        <form onSubmit={onSubmit} className="card space-y-4 bg-ink-800/95 p-6 backdrop-blur">
           <div>
-            <h1 className="font-display text-xl text-gold-300">{heading}</h1>
+            <h1 className="font-display text-xl text-neon-300">{heading}</h1>
             <p className="mt-1 text-sm text-stone-400">{subheading}</p>
           </div>
           {activeMode === 'login' && (data?.authMethods?.jellyfin || data?.authMethods?.emby) && (
@@ -180,7 +198,7 @@ export function Login() {
                   type="button"
                   onClick={() => setAccountKind(kind)}
                   className={`flex-1 rounded-md px-2 py-1.5 text-sm transition-colors ${
-                    accountKind === kind ? 'bg-gold-500/20 text-gold-300' : 'text-stone-400 hover:text-stone-200'
+                    accountKind === kind ? 'bg-neon-500/20 text-neon-300' : 'text-stone-400 hover:text-stone-200'
                   }`}
                 >
                   {label}
@@ -217,15 +235,15 @@ export function Login() {
             />
           )}
           {error && <p className="text-sm text-crimson-500">{error}</p>}
-          <button type="submit" className="btn btn-gold w-full" disabled={submit.isPending}>
+          <button type="submit" className="btn btn-neon w-full" disabled={submit.isPending}>
             {activeMode === 'setup' ? 'Create admin account' : activeMode === 'register' ? 'Create account' : 'Sign in'}
           </button>
           {!data?.needsSetup && (
             <>
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-gold-500/15" />
+                <div className="h-px flex-1 bg-neon-500/15" />
                 <span className="text-xs tracking-widest text-stone-500 uppercase">or</span>
-                <div className="h-px flex-1 bg-gold-500/15" />
+                <div className="h-px flex-1 bg-neon-500/15" />
               </div>
               <button
                 type="button"
@@ -262,7 +280,7 @@ export function Login() {
                   {plexPinId !== null && (
                     <button
                       type="button"
-                      className="w-full text-center text-sm text-stone-400 hover:text-gold-300"
+                      className="w-full text-center text-sm text-stone-400 hover:text-neon-300"
                       onClick={() => setPlexPinId(null)}
                     >
                       Cancel Plex sign-in
@@ -286,7 +304,7 @@ export function Login() {
                           <button
                             key={member.id}
                             type="button"
-                            className={`btn ${homeUser?.id === member.id ? 'btn-gold' : 'btn-ghost'}`}
+                            className={`btn ${homeUser?.id === member.id ? 'btn-neon' : 'btn-ghost'}`}
                             onClick={() => {
                               setError(null);
                               setHomeUser(member);
@@ -311,7 +329,7 @@ export function Login() {
                           />
                           <button
                             type="button"
-                            className="btn btn-gold shrink-0"
+                            className="btn btn-neon shrink-0"
                             disabled={homeLogin.isPending || !homePin}
                             onClick={() => homeLogin.mutate(homeUser)}
                           >
@@ -325,7 +343,7 @@ export function Login() {
               )}
               <button
                 type="button"
-                className="w-full text-center text-sm text-stone-400 hover:text-gold-300"
+                className="w-full text-center text-sm text-stone-400 hover:text-neon-300"
                 onClick={() => {
                   setError(null);
                   setMode(activeMode === 'login' ? 'register' : 'login');

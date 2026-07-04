@@ -57,7 +57,7 @@ export function Lists() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl text-gold-300">Lists</h1>
+      <h1 className="font-display text-2xl text-neon-300">Lists</h1>
       <p className="text-sm text-stone-400">
         Build watchlists for the randomizer. Lists are private unless you share them.
       </p>
@@ -69,7 +69,7 @@ export function Lists() {
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
         />
-        <button className="btn btn-gold" disabled={!newName.trim() || createList.isPending} onClick={() => createList.mutate()}>
+        <button className="btn btn-neon" disabled={!newName.trim() || createList.isPending} onClick={() => createList.mutate()}>
           Create
         </button>
       </div>
@@ -79,7 +79,7 @@ export function Lists() {
           <button
             key={l.id}
             onClick={() => setSelectedId(l.id)}
-            className={`btn ${selectedId === l.id ? 'btn-gold' : 'btn-ghost'}`}
+            className={`btn ${selectedId === l.id ? 'btn-neon' : 'btn-ghost'}`}
           >
             {l.name} ({l.itemCount}){l.isShared ? ' · shared' : ''}{!l.isOwner ? ` · by ${l.ownerName}` : ''}
           </button>

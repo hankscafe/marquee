@@ -20,7 +20,7 @@ import { getSetting } from '../settings.js';
 // so the one-vote-per-poll constraint still holds), keep the embed's counts
 // fresh, and announce the winner when the poll closes.
 
-const GOLD = 0xe6b23c;
+const ACCENT = 0x3ecbff;
 
 let client: Client | null = null;
 let botUser: string | null = null;
@@ -85,7 +85,7 @@ function pollEmbed(poll: PollRow, options: OptionRow[], final: boolean): EmbedBu
     return `**${i + 1}.** ${o.title} — ${n} vote${n === 1 ? '' : 's'}${winner}`;
   });
   const embed = new EmbedBuilder()
-    .setColor(GOLD)
+    .setColor(ACCENT)
     .setTitle(`🎬 ${poll.title}`)
     .setDescription([poll.description, poll.description ? '' : null, ...lines].filter((l): l is string => l !== null).join('\n'))
     .setFooter({

@@ -128,6 +128,8 @@ export const polls = sqliteTable('polls', {
   // Set once the poll has been posted to Discord, so votes and the close can sync back.
   discordMessageId: text('discord_message_id'),
   discordChannelId: text('discord_channel_id'),
+  // Admin-pinned polls sort first on the home page.
+  pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),

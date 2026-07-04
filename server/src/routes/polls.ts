@@ -40,27 +40,28 @@ export async function pollRoutes(app: FastifyInstance) {
       .select()
       .from(polls)
       .where(or(eq(polls.createdBy, userId), ne(polls.status, 'draft')))
-      .orderBy(desc(polls.createdAt))
+      .orderBy(desc(polls.pinned), desc(polls.createdAt))
       .limit(100)
       .all();
     return rows.map((p) => {
-      const optionCount = db
-        .select({ c: sql<number>`count(*)` })
+      const counts = getOptionCounts(p.id);
+      const options = db
+        .select()
         .from(pollOptions)
         .where(eq(pollOptions.pollId, p.id))
-        .get()!.c;
-      const voteCount = db
-        .select({ c: sql<number>`count(*)` })
-        .from(votes)
-        .where(eq(votes.pollId, p.id))
-        .get()!.c;
+        .all()
+        .map((o) => ({ id: o.id, title: o.title, mediaId: o.mediaId, votes: counts.get(o.id) ?? 0 }));
+      const voteCount = options.reduce((a, o) => a + o.votes, 0);
       return {
         id: p.id,
         title: p.title,
         status: p.status,
         shareToken: p.shareToken,
         isOwner: p.createdBy === userId,
-        optionCount,
+        pinned: p.pinned,
+        winnerOptionId: p.winnerOptionId,
+        options,
+        optionCount: options.length,
         voteCount,
         closesAt: p.closesAt,
         createdAt: p.createdAt,
@@ -158,6 +159,18 @@ export async function pollRoutes(app: FastifyInstance) {
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not post to Discord' });
     }
+  });
+
+  // Admins can pin a poll to the top of the home page.
+  app.post('/api/polls/:token/pin', { preHandler: requireUser }, async (request, reply) => {
+    const { token } = request.params as { token: string };
+    if (!request.user!.isAdmin) return reply.code(403).send({ error: 'Only admins can pin polls' });
+    const poll = pollByToken(token);
+    if (!poll) return reply.code(404).send({ error: 'Poll not found' });
+    const parsed = z.object({ pinned: z.boolean() }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
+    db.update(polls).set({ pinned: parsed.data.pinned }).where(eq(polls.id, poll.id)).run();
+    return serializePollDetail(pollByToken(token)!, request.user!.id);
   });
 
   app.post('/api/polls/:token/open', { preHandler: requireUser }, async (request, reply) => {

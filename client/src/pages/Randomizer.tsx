@@ -145,12 +145,12 @@ export function Randomizer() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6 text-center">
-      <h1 className="font-display text-2xl text-gold-300">Randomizer</h1>
+      <h1 className="font-display text-2xl text-neon-300">Randomizer</h1>
       <p className="text-sm text-stone-400">Can’t decide? Let the marquee pick tonight’s feature.</p>
 
       <div className="card space-y-4 p-5">
         <div className="space-y-1 text-left">
-          <label className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Draw from</label>
+          <label className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Draw from</label>
           <select className="input" value={encodeSource(source)} onChange={(e) => setSource(decodeSource(e.target.value))}>
             <option value="library">Whole library</option>
             {filters && filters.sections.length > 1 && (
@@ -189,7 +189,7 @@ export function Randomizer() {
               key={f}
               onClick={() => setTypeFilter(f)}
               disabled={isList}
-              className={`btn ${typeFilter === f && !isList ? 'btn-gold' : 'btn-ghost'}`}
+              className={`btn ${typeFilter === f && !isList ? 'btn-neon' : 'btn-ghost'}`}
             >
               {f === 'all' ? 'Everything' : f === 'movie' ? 'Movies' : 'Shows'}
             </button>
@@ -213,7 +213,7 @@ export function Randomizer() {
                 type="checkbox"
                 checked={unwatchedOnly}
                 onChange={(e) => setUnwatchedOnly(e.target.checked)}
-                className="accent-gold-400"
+                className="accent-neon-400"
               />
               Unwatched only
             </label>
@@ -246,7 +246,7 @@ export function Randomizer() {
         {isList && <p className="text-xs text-stone-500">Filters don’t apply to lists.</p>}
 
         <button
-          className="btn btn-gold w-full text-base"
+          className="btn btn-neon w-full text-base"
           disabled={spin.isPending || spinning}
           onClick={() => {
             setError(null);
@@ -273,7 +273,7 @@ export function Randomizer() {
 
       <div className="card space-y-4 p-5 text-left">
         <div>
-          <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Schedule this spin</h2>
+          <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Schedule this spin</h2>
           <p className="mt-1 text-sm text-stone-400">
             Runs automatically with the source and filters selected above{scheduleDiscord ? ' and announces the pick on Discord' : ''}.
           </p>
@@ -313,13 +313,13 @@ export function Randomizer() {
               type="checkbox"
               checked={scheduleDiscord}
               onChange={(e) => setScheduleDiscord(e.target.checked)}
-              className="accent-gold-400"
+              className="accent-neon-400"
             />
             Post to Discord
           </label>
         </div>
         <button
-          className="btn btn-gold"
+          className="btn btn-neon"
           disabled={createSchedule.isPending || !scheduleName.trim() || (scheduleKind === 'once' && !scheduleRunAt)}
           onClick={() => {
             setScheduleMessage(null);
@@ -331,7 +331,7 @@ export function Randomizer() {
         {scheduleMessage && <p className="text-sm text-stone-300">{scheduleMessage}</p>}
 
         {schedules && schedules.length > 0 && (
-          <ul className="space-y-3 border-t border-gold-500/10 pt-4">
+          <ul className="space-y-3 border-t border-neon-500/10 pt-4">
             {schedules.map((s) => (
               <li key={s.id} className="flex flex-wrap items-center justify-between gap-2">
                 <div>

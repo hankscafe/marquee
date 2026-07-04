@@ -93,6 +93,22 @@ export async function switchToHomeUser(ownerToken: string, homeUserId: number, p
   return json.authToken;
 }
 
+// Friends (accounts the owner shares the server with), for user import.
+export interface PlexFriend {
+  id: number;
+  username?: string;
+  title?: string;
+}
+
+export async function getFriends(ownerToken: string): Promise<PlexFriend[]> {
+  const res = await fetch(`${PLEX_TV}/api/v2/friends`, {
+    headers: { ...plexTvHeaders(), 'X-Plex-Token': ownerToken },
+  });
+  if (!res.ok) throw new Error(`plex.tv friends request failed (${res.status})`);
+  const json = (await res.json()) as PlexFriend[] | { friends?: PlexFriend[] };
+  return Array.isArray(json) ? json : (json.friends ?? []);
+}
+
 // Gate: only Plex accounts that can actually reach the admin's server may sign in.
 export async function hasServerAccess(serverUrl: string, userToken: string): Promise<boolean> {
   try {

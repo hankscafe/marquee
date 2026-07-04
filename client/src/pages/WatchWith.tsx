@@ -77,13 +77,13 @@ export function WatchWith() {
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div className="text-center">
-        <h1 className="font-display text-2xl text-gold-300">Watch With</h1>
+        <h1 className="font-display text-2xl text-neon-300">Watch With</h1>
         <p className="mt-1 text-sm text-stone-400">Two people, one pick — no arguing.</p>
       </div>
 
       <div className="card space-y-4 p-5">
         <div className="space-y-1">
-          <label className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Watching with</label>
+          <label className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Watching with</label>
           <select
             className="input"
             value={partnerId ?? ''}
@@ -106,10 +106,10 @@ export function WatchWith() {
         </div>
 
         <div className="flex justify-center gap-2">
-          <button className={`btn ${mode === 'library' ? 'btn-gold' : 'btn-ghost'}`} onClick={() => { setMode('library'); clearResults(); }}>
+          <button className={`btn ${mode === 'library' ? 'btn-neon' : 'btn-ghost'}`} onClick={() => { setMode('library'); clearResults(); }}>
             Neither has seen it
           </button>
-          <button className={`btn ${mode === 'watchlist' ? 'btn-gold' : 'btn-ghost'}`} onClick={() => { setMode('watchlist'); clearResults(); }}>
+          <button className={`btn ${mode === 'watchlist' ? 'btn-neon' : 'btn-ghost'}`} onClick={() => { setMode('watchlist'); clearResults(); }}>
             Both want to see it
           </button>
         </div>
@@ -122,7 +122,7 @@ export function WatchWith() {
         {mode === 'library' && (
           <div className="flex justify-center gap-2">
             {(['movie', 'show', 'all'] as const).map((f) => (
-              <button key={f} onClick={() => setTypeFilter(f)} className={`btn ${typeFilter === f ? 'btn-gold' : 'btn-ghost'}`}>
+              <button key={f} onClick={() => setTypeFilter(f)} className={`btn ${typeFilter === f ? 'btn-neon' : 'btn-ghost'}`}>
                 {f === 'movie' ? 'Movies' : f === 'show' ? 'Shows' : 'Everything'}
               </button>
             ))}
@@ -130,7 +130,7 @@ export function WatchWith() {
         )}
 
         <button
-          className="btn btn-gold w-full text-base"
+          className="btn btn-neon w-full text-base"
           disabled={!partnerId || spin.isPending}
           onClick={() => spin.mutate()}
         >
@@ -170,9 +170,9 @@ export function WatchWith() {
             {watchlistResult.year ?? ''} · on both of your watchlists, but not in the library yet
           </p>
           {requested ? (
-            <p className="text-sm text-gold-300">✓ Requested</p>
+            <p className="text-sm text-neon-300">✓ Requested</p>
           ) : watchlistResult.requestsEnabled && watchlistResult.tmdbId ? (
-            <button className="btn btn-gold mx-auto" disabled={request.isPending} onClick={() => request.mutate(watchlistResult.tmdbId!)}>
+            <button className="btn btn-neon mx-auto" disabled={request.isPending} onClick={() => request.mutate(watchlistResult.tmdbId!)}>
               Request it
             </button>
           ) : null}

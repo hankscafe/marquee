@@ -20,11 +20,11 @@ export function ReportIssue() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
-      <h1 className="font-display text-2xl text-gold-300">Report an issue</h1>
+      <h1 className="font-display text-2xl text-neon-300">Report an issue</h1>
       <p className="text-sm text-stone-400">Spotted a problem? Send a note to the admin.</p>
       {sent ? (
         <div className="card p-6 text-center">
-          <p className="font-display text-xl text-gold-300">Thanks — report sent!</p>
+          <p className="font-display text-xl text-neon-300">Thanks — report sent!</p>
           <button className="btn btn-ghost mt-4" onClick={() => setSent(false)}>
             Send another
           </button>
@@ -40,7 +40,7 @@ export function ReportIssue() {
           />
           {error && <p className="text-sm text-crimson-500">{error}</p>}
           <button
-            className="btn btn-gold"
+            className="btn btn-neon"
             disabled={submit.isPending || !subject.trim() || !body.trim()}
             onClick={() => {
               setError(null);

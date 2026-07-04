@@ -85,7 +85,7 @@ export function PosterMode() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 overflow-hidden bg-ink-950 px-6 py-8">
       {/* ambient glow behind the poster */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_50%_40%_at_50%_45%,rgba(230,178,60,0.10),transparent)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_50%_40%_at_50%_45%,rgba(62,203,255,0.10),transparent)]" />
 
       <div className="absolute top-4 right-4 flex gap-2">
         <button
@@ -112,7 +112,7 @@ export function PosterMode() {
         <Poster
           mediaId={mediaId}
           title={title}
-          className="rounded-xl shadow-[0_0_80px_rgba(230,178,60,0.15)]"
+          className="rounded-xl shadow-[0_0_80px_rgba(62,203,255,0.15)]"
         />
       </div>
 
@@ -138,7 +138,7 @@ export function PosterMode() {
       {session && (
         <div className="w-full max-w-2xl space-y-2">
           <div className="h-2 overflow-hidden rounded-full bg-ink-700">
-            <div className="h-full rounded-full bg-gold-400 transition-all duration-1000" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full bg-neon-400 transition-all duration-1000" style={{ width: `${pct}%` }} />
           </div>
           <div className="flex items-center justify-between text-sm text-stone-400">
             <span>{msToClock(elapsed)} / {msToClock(session.durationMs)}</span>

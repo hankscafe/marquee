@@ -14,8 +14,8 @@ export default defineConfig({
         name: 'Marquee',
         short_name: 'Marquee',
         description: 'Movie night polls and randomizer for your Plex server',
-        theme_color: '#120d09',
-        background_color: '#0a0705',
+        theme_color: '#070b16',
+        background_color: '#04070f',
         display: 'standalone',
         start_url: '/',
         icons: [

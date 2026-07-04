@@ -7,6 +7,7 @@ import { config } from './config.js';
 import { authPlugin } from './auth/plugin.js';
 import { authRoutes } from './auth/routes.js';
 import { adminRoutes } from './routes/admin.js';
+import { adminUserRoutes } from './routes/adminUsers.js';
 import { collectionRoutes } from './routes/collections.js';
 import { discordRoutes } from './routes/discord.js';
 import { franchiseRoutes } from './routes/franchises.js';
@@ -41,6 +42,7 @@ export async function buildApp() {
   await app.register(discordRoutes);
   await app.register(issueRoutes);
   await app.register(adminRoutes);
+  await app.register(adminUserRoutes);
 
   app.get('/api/health', async () => ({ ok: true }));
 

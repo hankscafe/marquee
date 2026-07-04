@@ -1,8 +1,179 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import type { AdminSettings, AdminStats, IssueReport, PlexTestResult, SyncResult, TmdbScanStatus } from '@marquee/shared';
+import type {
+  AdminSettings,
+  AdminStats,
+  AdminUserInfo,
+  IssueReport,
+  PlexTestResult,
+  SyncResult,
+  TmdbScanStatus,
+} from '@marquee/shared';
 import { api, ApiError } from '../api';
+import { useAuth } from '../auth';
+
+type AdminTab = 'overview' | 'servers' | 'integrations' | 'users' | 'issues';
+
+const TABS: { key: AdminTab; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'servers', label: 'Media servers' },
+  { key: 'integrations', label: 'Integrations' },
+  { key: 'users', label: 'Users' },
+  { key: 'issues', label: 'Issues' },
+];
+
+function UsersPanel() {
+  const queryClient = useQueryClient();
+  const { data: auth } = useAuth();
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newIsAdmin, setNewIsAdmin] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const { data: userList } = useQuery({
+    queryKey: ['admin', 'users'],
+    queryFn: () => api<AdminUserInfo[]>('/api/admin/users'),
+  });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+  const onError = (err: unknown) => setMessage(err instanceof ApiError ? `✗ ${err.message}` : '✗ Something went wrong');
+
+  const createUser = useMutation({
+    mutationFn: () =>
+      api<AdminUserInfo>('/api/admin/users', {
+        body: { username: newUsername, password: newPassword, isAdmin: newIsAdmin },
+      }),
+    onSuccess: (u) => {
+      setNewUsername('');
+      setNewPassword('');
+      setNewIsAdmin(false);
+      setMessage(`✓ Created ${u.username}`);
+      refresh();
+    },
+    onError,
+  });
+
+  const importPlex = useMutation({
+    mutationFn: () => api<{ imported: number; skipped: number }>('/api/admin/users/import-plex', { body: {} }),
+    onSuccess: (r) => {
+      setMessage(`✓ Imported ${r.imported} Plex user${r.imported === 1 ? '' : 's'} (${r.skipped} already existed)`);
+      refresh();
+    },
+    onError,
+  });
+
+  const toggleAdmin = useMutation({
+    mutationFn: ({ id, isAdmin }: { id: number; isAdmin: boolean }) =>
+      api(`/api/admin/users/${id}`, { method: 'PATCH', body: { isAdmin } }),
+    onSuccess: refresh,
+    onError,
+  });
+
+  const removeUser = useMutation({
+    mutationFn: (id: number) => api(`/api/admin/users/${id}`, { method: 'DELETE' }),
+    onSuccess: refresh,
+    onError,
+  });
+
+  const badges = (u: AdminUserInfo) =>
+    [
+      u.hasPassword && 'password',
+      u.plex && 'Plex',
+      u.jellyfin && 'Jellyfin',
+      u.emby && 'Emby',
+      u.discord && 'Discord',
+      u.oidc && 'SSO',
+    ].filter(Boolean) as string[];
+
+  return (
+    <>
+      <section className="card space-y-4 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">
+            Users {userList ? `(${userList.length})` : ''}
+          </h2>
+          <button className="btn btn-ghost" disabled={importPlex.isPending} onClick={() => importPlex.mutate()}>
+            {importPlex.isPending ? 'Importing…' : '⬇ Import Plex users'}
+          </button>
+        </div>
+        <p className="text-sm text-stone-400">
+          Import pre-creates accounts for your Plex Home members and friends — they sign in with Plex and land in
+          their account automatically.
+        </p>
+        {message && <p className="text-sm text-stone-300">{message}</p>}
+        <ul className="space-y-2">
+          {userList?.map((u) => (
+            <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neon-500/10 px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-sm text-stone-100">
+                  {u.username}
+                  {u.isAdmin && <span className="chip ml-2 bg-violet-500/20 text-violet-400">admin</span>}
+                  {u.id === auth?.user?.id && <span className="chip ml-1 bg-neon-500/15 text-neon-300">you</span>}
+                </p>
+                <p className="text-xs text-stone-500">
+                  {badges(u).join(' · ') || 'no sign-in method yet'} · joined {new Date(u.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+              {u.id !== auth?.user?.id && (
+                <div className="flex gap-1">
+                  <button
+                    className="btn btn-ghost px-3 py-1 text-xs"
+                    onClick={() => toggleAdmin.mutate({ id: u.id, isAdmin: !u.isAdmin })}
+                  >
+                    {u.isAdmin ? 'Remove admin' : 'Make admin'}
+                  </button>
+                  <button
+                    className="btn btn-ghost px-3 py-1 text-xs"
+                    onClick={() => {
+                      if (window.confirm(`Delete ${u.username}? Their votes and lists go with them.`)) {
+                        removeUser.mutate(u.id);
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="card space-y-4 p-5">
+        <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Create a local user</h2>
+        <div className="flex flex-wrap gap-3">
+          <input
+            className="input min-w-40 flex-1"
+            placeholder="Username"
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+          />
+          <input
+            className="input min-w-40 flex-1"
+            type="password"
+            placeholder="Password (min 8 characters)"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-stone-300">
+          <input type="checkbox" checked={newIsAdmin} onChange={(e) => setNewIsAdmin(e.target.checked)} className="accent-neon-400" />
+          Administrator
+        </label>
+        <button
+          className="btn btn-neon"
+          disabled={createUser.isPending || !newUsername.trim() || newPassword.length < 8}
+          onClick={() => {
+            setMessage(null);
+            createUser.mutate();
+          }}
+        >
+          Create user
+        </button>
+      </section>
+    </>
+  );
+}
 
 // Jellyfin/Emby share one card shape — url + API key + test.
 function JfServerCard({
@@ -44,7 +215,7 @@ function JfServerCard({
 
   return (
     <section className="card space-y-4 p-5">
-      <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">{label} connection (optional)</h2>
+      <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">{label} connection (optional)</h2>
       <input
         className="input"
         placeholder={`${label} server URL, e.g. http://192.168.1.10:8096`}
@@ -59,7 +230,7 @@ function JfServerCard({
         onChange={(e) => setApiKey(e.target.value)}
       />
       <div className="flex flex-wrap gap-2">
-        <button className="btn btn-gold" disabled={saveJf.isPending || !url} onClick={() => saveJf.mutate()}>
+        <button className="btn btn-neon" disabled={saveJf.isPending || !url} onClick={() => saveJf.mutate()}>
           Save
         </button>
         <button className="btn btn-ghost" disabled={testJf.isPending} onClick={() => testJf.mutate()}>
@@ -74,7 +245,7 @@ function JfServerCard({
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="card p-4 text-center">
-      <p className="font-display text-3xl text-gold-300">{value}</p>
+      <p className="font-display text-3xl text-neon-300">{value}</p>
       <p className="mt-1 text-xs tracking-widest text-stone-400 uppercase">{label}</p>
     </div>
   );
@@ -82,6 +253,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
 
 export function Admin() {
   const queryClient = useQueryClient();
+  const [tab, setTab] = useState<AdminTab>('overview');
   const [plexUrl, setPlexUrl] = useState('');
   const [plexToken, setPlexToken] = useState('');
   const [traktClientId, setTraktClientId] = useState('');
@@ -214,10 +386,25 @@ export function Admin() {
   });
 
   return (
-    <div className="space-y-8">
-      <h1 className="font-display text-2xl text-gold-300">Admin dashboard</h1>
+    <div className="space-y-6">
+      <h1 className="font-display text-2xl text-neon-300">Admin</h1>
 
-      {stats && (
+      <div className="flex flex-wrap gap-1 rounded-xl border border-neon-500/15 bg-ink-800/80 p-1">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-colors ${
+              tab === t.key ? 'bg-neon-500/20 text-neon-300' : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            {t.label}
+            {t.key === 'issues' && stats && stats.openIssues > 0 ? ` (${stats.openIssues})` : ''}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' && stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           <StatCard label="Users" value={stats.users} />
           <StatCard label="Polls" value={stats.polls} />
@@ -229,8 +416,10 @@ export function Admin() {
         </div>
       )}
 
+      {tab === 'servers' && (
+        <>
       <section className="card space-y-4 p-5">
-        <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Plex connection</h2>
+        <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Plex connection</h2>
         <input
           className="input"
           placeholder="Plex server URL, e.g. http://192.168.1.10:32400"
@@ -246,7 +435,7 @@ export function Admin() {
         />
         <div className="flex flex-wrap gap-2">
           <button
-            className="btn btn-gold"
+            className="btn btn-neon"
             disabled={save.isPending || !plexUrl}
             onClick={() => save.mutate({ plexUrl, plexToken: plexToken || undefined })}
           >
@@ -264,12 +453,16 @@ export function Admin() {
 
       <JfServerCard kind="jellyfin" savedUrl={settings?.jellyfinUrl} keySet={settings?.jellyfinKeySet} />
       <JfServerCard kind="emby" savedUrl={settings?.embyUrl} keySet={settings?.embyKeySet} />
+        </>
+      )}
 
+      {tab === 'integrations' && (
+        <>
       <section className="card space-y-4 p-5">
-        <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Trakt</h2>
+        <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Trakt</h2>
         <p className="text-sm text-stone-400">
           Lets users connect their own Trakt accounts for personal watch status. Create an API app at{' '}
-          <a href="https://trakt.tv/oauth/applications" target="_blank" rel="noreferrer" className="text-gold-300 underline">
+          <a href="https://trakt.tv/oauth/applications" target="_blank" rel="noreferrer" className="text-neon-300 underline">
             trakt.tv/oauth/applications
           </a>{' '}
           (redirect URI: <code className="text-stone-300">urn:ietf:wg:oauth:2.0:oob</code>) and paste its credentials here.
@@ -288,7 +481,7 @@ export function Admin() {
           onChange={(e) => setTraktClientSecret(e.target.value)}
         />
         <button
-          className="btn btn-gold"
+          className="btn btn-neon"
           disabled={save.isPending || !traktClientId}
           onClick={() => save.mutate({ traktClientId, traktClientSecret: traktClientSecret || undefined })}
         >
@@ -298,11 +491,11 @@ export function Admin() {
       </section>
 
       <section className="card space-y-4 p-5">
-        <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">TMDb — film series</h2>
+        <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">TMDb — film series</h2>
         <p className="text-sm text-stone-400">
           Finds film series your library has started and which entries are missing (shown on the Collections page).
           Get a free API key at{' '}
-          <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer" className="text-gold-300 underline">
+          <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer" className="text-neon-300 underline">
             themoviedb.org/settings/api
           </a>
           .
@@ -315,7 +508,7 @@ export function Admin() {
           onChange={(e) => setTmdbApiKey(e.target.value)}
         />
         <div className="flex flex-wrap items-center gap-3">
-          <button className="btn btn-gold" disabled={save.isPending || !tmdbApiKey} onClick={() => save.mutate({ tmdbApiKey })}>
+          <button className="btn btn-neon" disabled={save.isPending || !tmdbApiKey} onClick={() => save.mutate({ tmdbApiKey })}>
             Save key
           </button>
           <button
@@ -342,10 +535,10 @@ export function Admin() {
       </section>
 
       <section className="card space-y-4 p-5">
-        <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Discord</h2>
+        <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Discord</h2>
         <p className="text-sm text-stone-400">
           Post polls to a channel where people vote with buttons — no Marquee account needed. Create a bot at{' '}
-          <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="text-gold-300 underline">
+          <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="text-neon-300 underline">
             discord.com/developers
           </a>
           , invite it to your server with <em>Send Messages</em> permission, and enable{' '}
@@ -372,7 +565,7 @@ export function Admin() {
         />
         <div className="flex flex-wrap gap-2">
           <button
-            className="btn btn-gold"
+            className="btn btn-neon"
             disabled={save.isPending || (!discordToken && !discordChannelId)}
             onClick={() =>
               save.mutate({
@@ -392,7 +585,7 @@ export function Admin() {
       </section>
 
       <section className="card space-y-4 p-5">
-        <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">OIDC single sign-on</h2>
+        <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">OIDC single sign-on</h2>
         <p className="text-sm text-stone-400">
           Let users sign in through Authentik, Authelia, Keycloak, or any OIDC provider.
           {settings?.oidcRedirectUri ? (
@@ -433,7 +626,7 @@ export function Admin() {
         />
         <div className="flex flex-wrap gap-2">
           <button
-            className="btn btn-gold"
+            className="btn btn-neon"
             disabled={save.isPending || !oidcIssuer || !oidcClientId}
             onClick={() =>
               save.mutate({
@@ -454,7 +647,7 @@ export function Admin() {
       </section>
 
       <section className="card space-y-4 p-5">
-        <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Requests — Overseerr / Jellyseerr / Ombi</h2>
+        <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Requests — Overseerr / Jellyseerr / Ombi</h2>
         <p className="text-sm text-stone-400">
           Lets users request missing titles (e.g. from incomplete film series) straight from Marquee.
         </p>
@@ -479,7 +672,7 @@ export function Admin() {
         />
         <div className="flex flex-wrap gap-2">
           <button
-            className="btn btn-gold"
+            className="btn btn-neon"
             disabled={save.isPending || !seerrUrl}
             onClick={() => save.mutate({ seerrUrl, seerrApiKey: seerrApiKey || undefined, seerrKind })}
           >
@@ -491,10 +684,14 @@ export function Admin() {
         </div>
         {seerrMessage && <p className="text-sm text-stone-300">{seerrMessage}</p>}
       </section>
+        </>
+      )}
 
-      {stats && stats.topChoices.length > 0 && (
+      {tab === 'users' && <UsersPanel />}
+
+      {tab === 'overview' && stats && stats.topChoices.length > 0 && (
         <section className="card p-5">
-          <h2 className="mb-3 text-xs font-semibold tracking-widest text-gold-500 uppercase">Most-voted titles</h2>
+          <h2 className="mb-3 text-xs font-semibold tracking-widest text-neon-500 uppercase">Most-voted titles</h2>
           <ol className="space-y-1">
             {stats.topChoices.map((t, i) => (
               <li key={t.title} className="flex justify-between text-sm">
@@ -508,13 +705,13 @@ export function Admin() {
         </section>
       )}
 
-      {stats && stats.recentPolls.length > 0 && (
+      {tab === 'overview' && stats && stats.recentPolls.length > 0 && (
         <section className="card p-5">
-          <h2 className="mb-3 text-xs font-semibold tracking-widest text-gold-500 uppercase">Recent polls</h2>
+          <h2 className="mb-3 text-xs font-semibold tracking-widest text-neon-500 uppercase">Recent polls</h2>
           <ul className="space-y-1">
             {stats.recentPolls.map((p) => (
               <li key={p.id} className="flex justify-between text-sm">
-                <Link to={`/p/${p.shareToken}`} className="text-stone-200 hover:text-gold-300">
+                <Link to={`/p/${p.shareToken}`} className="text-stone-200 hover:text-neon-300">
                   {p.title}
                 </Link>
                 <span className="text-stone-400">{p.status}</span>
@@ -524,16 +721,17 @@ export function Admin() {
         </section>
       )}
 
+      {tab === 'issues' && (
       <section className="card p-5">
-        <h2 className="mb-3 text-xs font-semibold tracking-widest text-gold-500 uppercase">Issue reports</h2>
+        <h2 className="mb-3 text-xs font-semibold tracking-widest text-neon-500 uppercase">Issue reports</h2>
         {!issues?.length && <p className="text-sm text-stone-400">No issues reported. Smooth screening!</p>}
         <ul className="space-y-3">
           {issues?.map((issue) => (
-            <li key={issue.id} className="rounded-lg border border-gold-500/10 p-3">
+            <li key={issue.id} className="rounded-lg border border-neon-500/10 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-medium text-stone-100">{issue.subject}</p>
                 <div className="flex items-center gap-2">
-                  <span className={`chip ${issue.status === 'open' ? 'bg-crimson-500/20 text-crimson-500' : 'bg-gold-500/15 text-gold-300'}`}>
+                  <span className={`chip ${issue.status === 'open' ? 'bg-crimson-500/20 text-crimson-500' : 'bg-neon-500/15 text-neon-300'}`}>
                     {issue.status}
                   </span>
                   <button
@@ -552,6 +750,7 @@ export function Admin() {
           ))}
         </ul>
       </section>
+      )}
     </div>
   );
 }

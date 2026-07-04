@@ -46,7 +46,7 @@ export function Account() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
-      <h1 className="font-display text-2xl text-gold-300">Account</h1>
+      <h1 className="font-display text-2xl text-neon-300">Account</h1>
 
       <div className="card space-y-1 p-5">
         <p className="font-display text-xl text-stone-100">{auth?.user?.username}</p>
@@ -55,7 +55,7 @@ export function Account() {
 
       <section className="card space-y-4 p-5">
         <div>
-          <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Passkeys</h2>
+          <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Passkeys</h2>
           <p className="mt-1 text-sm text-stone-400">
             Sign in with your fingerprint, face, or device PIN — no password needed.
           </p>
@@ -64,7 +64,7 @@ export function Account() {
         {keys && keys.length > 0 && (
           <ul className="space-y-2">
             {keys.map((k) => (
-              <li key={k.id} className="flex items-center justify-between gap-2 rounded-lg border border-gold-500/10 px-3 py-2">
+              <li key={k.id} className="flex items-center justify-between gap-2 rounded-lg border border-neon-500/10 px-3 py-2">
                 <div>
                   <p className="text-sm text-stone-100">🔑 {k.name}</p>
                   <p className="text-xs text-stone-500">
@@ -89,7 +89,7 @@ export function Account() {
             onChange={(e) => setPasskeyName(e.target.value)}
           />
           <button
-            className="btn btn-gold shrink-0"
+            className="btn btn-neon shrink-0"
             disabled={addPasskey.isPending}
             onClick={() => {
               setMessage(null);

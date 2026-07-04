@@ -1,0 +1,1 @@
+ALTER TABLE `polls` ADD `pinned` integer DEFAULT false NOT NULL;

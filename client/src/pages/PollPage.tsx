@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DiscordStatus, PollDetail } from '@marquee/shared';
 import { api, ApiError } from '../api';
+import { useAuth } from '../auth';
 import { MediaDetailsModal } from '../components/MediaDetails';
 import { Poster } from '../components/Poster';
 
@@ -37,6 +38,17 @@ export function PollPage() {
     mutationFn: (optionId: number) => api<PollDetail>(`/api/polls/${token}/vote`, { body: { optionId } }),
     onSuccess: (data) => queryClient.setQueryData(['poll', token], data),
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong'),
+  });
+
+  const { data: auth } = useAuth();
+
+  const togglePin = useMutation({
+    mutationFn: (pinned: boolean) => api<PollDetail>(`/api/polls/${token}/pin`, { body: { pinned } }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['poll', token], data);
+      queryClient.invalidateQueries({ queryKey: ['polls'] });
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not update pin'),
   });
 
   const transition = useMutation({
@@ -84,7 +96,7 @@ export function PollPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl text-gold-300">{poll.title}</h1>
+          <h1 className="font-display text-2xl text-neon-300">{poll.title}</h1>
           {poll.description && <p className="mt-1 text-stone-400">{poll.description}</p>}
           <p className="mt-2 text-sm text-stone-500">
             {poll.totalVotes} vote{poll.totalVotes === 1 ? '' : 's'}
@@ -97,8 +109,13 @@ export function PollPage() {
           <button className="btn btn-ghost" onClick={share}>
             {copied ? 'Link copied!' : 'Share'}
           </button>
+          {auth?.user?.isAdmin && (
+            <button className="btn btn-ghost" disabled={togglePin.isPending} onClick={() => togglePin.mutate(!poll.pinned)}>
+              {poll.pinned ? '📌 Unpin' : '📌 Pin'}
+            </button>
+          )}
           {poll.isOwner && poll.status === 'draft' && (
-            <button className="btn btn-gold" onClick={() => transition.mutate('open')}>
+            <button className="btn btn-neon" onClick={() => transition.mutate('open')}>
               Open voting
             </button>
           )}
@@ -114,7 +131,7 @@ export function PollPage() {
               {postDiscord.isPending ? 'Posting…' : 'Post to Discord'}
             </button>
           )}
-          {poll.discordPosted && <span className="chip self-center bg-gold-500/15 text-gold-300">On Discord ✓</span>}
+          {poll.discordPosted && <span className="chip self-center bg-neon-500/15 text-neon-300">On Discord ✓</span>}
           {poll.isOwner && poll.status === 'open' && (
             <button className="btn btn-danger" onClick={() => transition.mutate('close')}>
               Close voting
@@ -134,13 +151,13 @@ export function PollPage() {
       </div>
 
       {poll.status === 'closed' && winner && (
-        <div className="card border-gold-400/40 p-5 text-center">
-          <p className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Tonight’s feature</p>
+        <div className="card border-neon-400/40 p-5 text-center">
+          <p className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Tonight’s feature</p>
           <p className="marquee-title mt-1 text-2xl">🏆 {winner.title}</p>
         </div>
       )}
 
-      {canVote && <p className="text-sm text-gold-300">Tap a poster to cast your vote — you only get one!</p>}
+      {canVote && <p className="text-sm text-neon-300">Tap a poster to cast your vote — you only get one!</p>}
       {error && <p className="text-sm text-crimson-500">{error}</p>}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
@@ -152,7 +169,7 @@ export function PollPage() {
             <div key={option.id} className="relative">
               {option.mediaId !== null && (
                 <button
-                  className="absolute top-2 right-2 z-[1] flex h-9 w-9 items-center justify-center rounded-full bg-ink-950/80 text-gold-300 backdrop-blur hover:bg-ink-950"
+                  className="absolute top-2 right-2 z-[1] flex h-9 w-9 items-center justify-center rounded-full bg-ink-950/80 text-neon-300 backdrop-blur hover:bg-ink-950"
                   onClick={() => setDetailsId(option.mediaId)}
                   title="About this title"
                   aria-label={`About ${option.title}`}
@@ -167,8 +184,8 @@ export function PollPage() {
                   vote.mutate(option.id);
                 }}
                 className={`card w-full overflow-hidden text-left transition-transform ${
-                  canVote ? 'active:scale-95 hover:border-gold-400/60' : 'cursor-default'
-                } ${isMyVote ? 'ring-2 ring-gold-400' : ''} ${isWinner ? 'border-gold-400/60' : ''}`}
+                  canVote ? 'active:scale-95 hover:border-neon-400/60' : 'cursor-default'
+                } ${isMyVote ? 'ring-2 ring-neon-400' : ''} ${isWinner ? 'border-neon-400/60' : ''}`}
               >
                 <Poster mediaId={option.mediaId} title={option.title} />
                 <div className="space-y-2 p-3">
@@ -180,7 +197,7 @@ export function PollPage() {
                 {showResults && (
                   <>
                     <div className="h-1.5 overflow-hidden rounded-full bg-ink-700">
-                      <div className="h-full rounded-full bg-gold-400 transition-all" style={{ width: `${pct}%` }} />
+                      <div className="h-full rounded-full bg-neon-400 transition-all" style={{ width: `${pct}%` }} />
                     </div>
                     <p className="text-xs text-stone-400">
                       {option.votes} vote{option.votes === 1 ? '' : 's'} · {pct}%

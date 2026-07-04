@@ -10,8 +10,8 @@ export function MediaFacts({ item }: { item: MediaItem }) {
         {item.year && <span>{item.year}</span>}
         {item.durationMs != null && item.durationMs > 0 && <span>· {Math.round(item.durationMs / 60000)} min</span>}
         {item.contentRating && <span className="chip border border-stone-500/40 text-stone-300">{item.contentRating}</span>}
-        {item.rating != null && <span className="text-gold-300">★ {item.rating.toFixed(1)}</span>}
-        {item.watched && <span className="chip bg-gold-500/15 text-gold-300">Watched</span>}
+        {item.rating != null && <span className="text-neon-300">★ {item.rating.toFixed(1)}</span>}
+        {item.watched && <span className="chip bg-neon-500/15 text-neon-300">Watched</span>}
       </div>
       {item.genres && item.genres.length > 0 && (
         <p className="text-sm text-stone-400">{item.genres.join(' · ')}</p>
@@ -29,7 +29,7 @@ export function MediaFacts({ item }: { item: MediaItem }) {
       )}
       <div className="flex flex-wrap gap-2 pt-2">
         {item.watchUrl && (
-          <a href={item.watchUrl} target="_blank" rel="noreferrer" className="btn btn-gold">
+          <a href={item.watchUrl} target="_blank" rel="noreferrer" className="btn btn-neon">
             ▶ Watch on {item.source === 'plex' ? 'Plex' : item.source === 'jellyfin' ? 'Jellyfin' : 'Emby'}
           </a>
         )}
@@ -69,7 +69,7 @@ export function MediaDetailsModal({ mediaId, onClose }: { mediaId: number | null
               <div className="w-28 shrink-0">
                 <Poster mediaId={item.id} title={item.title} className="rounded-lg" />
               </div>
-              <h2 className="font-display text-xl text-gold-300">{item.title}</h2>
+              <h2 className="font-display text-xl text-neon-300">{item.title}</h2>
             </div>
             <MediaFacts item={item} />
           </div>

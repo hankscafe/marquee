@@ -41,7 +41,7 @@ function Franchises() {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Film series (TMDb)</h2>
+        <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Film series (TMDb)</h2>
         <p className="mt-1 text-sm text-stone-400">
           Series your library has started — and what's missing to complete them.
         </p>
@@ -65,8 +65,8 @@ function Franchises() {
                 setSelectedId(f.id === selectedId ? null : f.id);
                 setMessage(null);
               }}
-              className={`card p-4 text-left transition-colors hover:border-gold-400/50 ${
-                selectedId === f.id ? 'ring-2 ring-gold-400' : ''
+              className={`card p-4 text-left transition-colors hover:border-neon-400/50 ${
+                selectedId === f.id ? 'ring-2 ring-neon-400' : ''
               }`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -74,7 +74,7 @@ function Franchises() {
                 {f.missing > 0 && <span className="chip bg-crimson-500/20 text-crimson-500">{f.missing} missing</span>}
               </div>
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-700">
-                <div className="h-full rounded-full bg-gold-400" style={{ width: `${pct}%` }} />
+                <div className="h-full rounded-full bg-neon-400" style={{ width: `${pct}%` }} />
               </div>
               <p className="mt-2 text-xs text-stone-400">
                 {f.owned}/{f.total} in library
@@ -109,12 +109,12 @@ function Franchises() {
                   {p.title} {p.year ? `(${p.year})` : ''}
                 </p>
                 {p.inLibrary ? (
-                  <p className="text-xs text-gold-500">In library</p>
+                  <p className="text-xs text-neon-500">In library</p>
                 ) : requested.has(p.tmdbMovieId) ? (
-                  <p className="text-xs text-gold-300">✓ Requested</p>
+                  <p className="text-xs text-neon-300">✓ Requested</p>
                 ) : detail.requestsEnabled ? (
                   <button
-                    className="mt-1 w-full rounded-md border border-gold-500/25 px-2 py-1 text-xs text-gold-300 hover:bg-gold-500/10"
+                    className="mt-1 w-full rounded-md border border-neon-500/25 px-2 py-1 text-xs text-neon-300 hover:bg-neon-500/10"
                     disabled={requestTitle.isPending}
                     onClick={() => requestTitle.mutate(p.tmdbMovieId)}
                   >
@@ -210,7 +210,7 @@ function TraktCard() {
     <div className="card space-y-3 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Trakt</h2>
+          <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Trakt</h2>
           <p className="mt-1 text-sm text-stone-400">
             {status.connected
               ? `Connected — ${status.watchedCount} watched titles matched. Watch status here and in the randomizer is yours, not the server account's.`
@@ -219,7 +219,7 @@ function TraktCard() {
         </div>
         <div className="flex gap-2">
           {!status.connected && status.configured && (
-            <button className="btn btn-gold" onClick={() => connect.mutate()} disabled={connect.isPending || !!device}>
+            <button className="btn btn-neon" onClick={() => connect.mutate()} disabled={connect.isPending || !!device}>
               Connect Trakt
             </button>
           )}
@@ -243,16 +243,16 @@ function TraktCard() {
         </p>
       )}
       {device && (
-        <div className="rounded-lg border border-gold-500/20 bg-ink-950/60 p-4 text-center">
+        <div className="rounded-lg border border-neon-500/20 bg-ink-950/60 p-4 text-center">
           <p className="text-sm text-stone-300">
             Go to{' '}
-            <a href={device.verificationUrl} target="_blank" rel="noreferrer" className="text-gold-300 underline">
+            <a href={device.verificationUrl} target="_blank" rel="noreferrer" className="text-neon-300 underline">
               {device.verificationUrl}
             </a>{' '}
             and enter:
           </p>
-          <p className="font-display mt-2 text-3xl tracking-[0.3em] text-gold-300">{device.userCode}</p>
-          <button className="mt-3 text-sm text-stone-400 hover:text-gold-300" onClick={() => setDevice(null)}>
+          <p className="font-display mt-2 text-3xl tracking-[0.3em] text-neon-300">{device.userCode}</p>
+          <button className="mt-3 text-sm text-stone-400 hover:text-neon-300" onClick={() => setDevice(null)}>
             Cancel
           </button>
         </div>
@@ -293,7 +293,7 @@ export function Collections() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl text-gold-300">Collections</h1>
+      <h1 className="font-display text-2xl text-neon-300">Collections</h1>
       <TraktCard />
 
       {isLoading && <p className="text-stone-400">Loading…</p>}
@@ -317,13 +317,13 @@ export function Collections() {
                 setPick(null);
                 setSpinError(null);
               }}
-              className={`card p-4 text-left transition-colors hover:border-gold-400/50 ${
-                selectedId === c.id ? 'ring-2 ring-gold-400' : ''
+              className={`card p-4 text-left transition-colors hover:border-neon-400/50 ${
+                selectedId === c.id ? 'ring-2 ring-neon-400' : ''
               }`}
             >
               <p className="font-display text-lg text-stone-100">{c.title}</p>
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-700">
-                <div className="h-full rounded-full bg-gold-400" style={{ width: `${pct}%` }} />
+                <div className="h-full rounded-full bg-neon-400" style={{ width: `${pct}%` }} />
               </div>
               <p className="mt-2 text-xs text-stone-400">
                 {c.watchedCount}/{c.itemCount} watched
@@ -339,7 +339,7 @@ export function Collections() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-display text-xl text-stone-100">{detail.title}</h2>
             <button
-              className="btn btn-gold"
+              className="btn btn-neon"
               disabled={spinUnwatched.isPending}
               onClick={() => spinUnwatched.mutate(detail.id)}
             >
@@ -348,7 +348,7 @@ export function Collections() {
           </div>
           {spinError && <p className="text-sm text-crimson-500">{spinError}</p>}
           {pick && (
-            <div className="flex flex-col gap-4 rounded-lg border border-gold-400/40 bg-ink-950/50 p-4 sm:flex-row">
+            <div className="flex flex-col gap-4 rounded-lg border border-neon-400/40 bg-ink-950/50 p-4 sm:flex-row">
               <div className="mx-auto w-32 shrink-0 sm:mx-0">
                 <Poster mediaId={pick.id} title={pick.title} className="rounded-lg" />
               </div>
@@ -364,7 +364,7 @@ export function Collections() {
                 <div className="relative">
                   <Poster mediaId={m.id} title={m.title} className="rounded-lg" />
                   {m.watchedByMe && (
-                    <span className="absolute top-1.5 right-1.5 rounded-full bg-ink-950/85 px-1.5 py-0.5 text-xs text-gold-300">
+                    <span className="absolute top-1.5 right-1.5 rounded-full bg-ink-950/85 px-1.5 py-0.5 text-xs text-neon-300">
                       ✓
                     </span>
                   )}

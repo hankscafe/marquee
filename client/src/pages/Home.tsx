@@ -1,27 +1,89 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { PollSummary } from '@marquee/shared';
 import { api } from '../api';
 
 const statusChip: Record<string, string> = {
-  open: 'chip bg-gold-500/20 text-gold-300',
+  open: 'chip bg-neon-500/20 text-neon-300',
   draft: 'chip bg-stone-500/20 text-stone-400',
-  closed: 'chip bg-crimson-500/20 text-crimson-500',
+  closed: 'chip bg-violet-500/20 text-violet-400',
 };
 
-function PollCard({ poll }: { poll: PollSummary }) {
+// Poster that fills its (variable-width) container — used in the weighted strip.
+function PosterFill({ mediaId, title }: { mediaId: number | null; title: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!mediaId || failed) {
+    return <div className="flex h-full w-full items-center justify-center bg-ink-700 text-2xl">🎬</div>;
+  }
   return (
-    <Link to={`/p/${poll.shareToken}`} className="card block p-4 transition-colors hover:border-gold-500/40">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="font-display text-lg text-stone-100">{poll.title}</h3>
+    <img
+      src={`/api/media/${mediaId}/poster`}
+      alt={title}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-full w-full object-cover"
+    />
+  );
+}
+
+function PollCard({ poll }: { poll: PollSummary }) {
+  const total = poll.options.reduce((a, o) => a + o.votes, 0);
+  const winner = poll.status === 'closed' ? poll.options.find((o) => o.id === poll.winnerOptionId) : null;
+  // Show the front-runners first so the strip reads left-to-right by popularity.
+  const strip = [...poll.options].sort((a, b) => b.votes - a.votes).slice(0, 5);
+
+  return (
+    <Link to={`/p/${poll.shareToken}`} className="card block overflow-hidden transition-colors hover:border-neon-400/50">
+      <div className="flex items-start justify-between gap-3 p-4 pb-2">
+        <h3 className="font-display text-lg text-stone-100">
+          {poll.pinned && <span title="Pinned">📌 </span>}
+          {poll.title}
+        </h3>
         <span className={statusChip[poll.status]}>{poll.status}</span>
       </div>
-      <p className="mt-2 text-sm text-stone-400">
+
+      {winner ? (
+        <div className="flex items-center gap-4 px-4 py-2">
+          <div className="h-32 w-[5.3rem] shrink-0 overflow-hidden rounded-lg ring-1 ring-neon-400/50">
+            <PosterFill mediaId={winner.mediaId} title={winner.title} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Winner</p>
+            <p className="font-display truncate text-xl text-stone-100">🏆 {winner.title}</p>
+            <p className="mt-1 text-sm text-stone-400">
+              {winner.votes} of {total} vote{total === 1 ? '' : 's'}
+              {total > 0 ? ` · ${Math.round((winner.votes / total) * 100)}%` : ''}
+            </p>
+          </div>
+        </div>
+      ) : (
+        strip.length > 0 && (
+          <div className="flex h-32 gap-1 px-4 py-2">
+            {strip.map((o) => {
+              const pct = total > 0 ? Math.round((o.votes / total) * 100) : 0;
+              return (
+                <div
+                  key={o.id}
+                  className="relative min-w-0 overflow-hidden rounded-md transition-all duration-500"
+                  style={{ flexGrow: o.votes + 1, flexBasis: 0 }}
+                  title={`${o.title} — ${o.votes} vote${o.votes === 1 ? '' : 's'}`}
+                >
+                  <PosterFill mediaId={o.mediaId} title={o.title} />
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950/95 via-ink-950/60 to-transparent px-1 pt-5 pb-1 text-center text-[10px] leading-tight text-stone-200">
+                    {o.votes} · {pct}%
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      <p className="px-4 pt-1 pb-3 text-sm text-stone-400">
         {poll.optionCount} option{poll.optionCount === 1 ? '' : 's'} · {poll.voteCount} vote
         {poll.voteCount === 1 ? '' : 's'}
-        {poll.closesAt && poll.status === 'open' && (
-          <> · closes {new Date(poll.closesAt).toLocaleString()}</>
-        )}
+        {poll.closesAt && poll.status === 'open' && <> · closes {new Date(poll.closesAt).toLocaleString()}</>}
       </p>
     </Link>
   );
@@ -40,8 +102,8 @@ export function Home() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl text-gold-300">Polls</h1>
-        <Link to="/polls/new" className="btn btn-gold">
+        <h1 className="font-display text-2xl text-neon-300">Polls</h1>
+        <Link to="/polls/new" className="btn btn-neon">
           + New poll
         </Link>
       </div>
@@ -52,14 +114,14 @@ export function Home() {
         <div className="card p-8 text-center">
           <p className="font-display text-xl text-stone-300">No polls yet</p>
           <p className="mt-2 text-sm text-stone-400">
-            Create your first poll — or ask an admin to sync the Plex library so there are movies to pick from.
+            Create your first poll — or ask an admin to sync the media library so there are titles to pick from.
           </p>
         </div>
       )}
 
       {open.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Now showing</h2>
+          <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Now showing</h2>
           <div className="grid gap-3 sm:grid-cols-2">{open.map((p) => <PollCard key={p.id} poll={p} />)}</div>
         </section>
       )}
