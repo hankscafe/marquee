@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  /* Movie-theater palette: deep warm blacks, marquee gold, velvet crimson. */
+  --color-ink-950: #0a0705;
+  --color-ink-900: #120d09;
+  --color-ink-800: #1b1410;
+  --color-ink-700: #2a1f16;
+  --color-gold-300: #f5d78e;
+  --color-gold-400: #e6b23c;
+  --color-gold-500: #c9932a;
+  --color-gold-600: #a1731d;
+  --color-crimson-500: #a4243b;
+  --color-crimson-700: #6e1626;
+  --font-display: Georgia, "Times New Roman", serif;
+}
+
+body {
+  @apply bg-ink-900 text-stone-200 antialiased;
+  background-image: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(230, 178, 60, 0.07), transparent);
+  min-height: 100vh;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-gold-500/15 bg-ink-800/80 shadow-lg shadow-black/40;
+  }
+  /* py-2.5 keeps buttons at ~44px — comfortable touch targets on phones/tablets. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors select-none disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-gold {
+    @apply bg-gold-400 text-ink-950 hover:bg-gold-300 active:bg-gold-500;
+  }
+  .btn-ghost {
+    @apply border border-gold-500/25 text-gold-300 hover:bg-gold-500/10;
+  }
+  .btn-danger {
+    @apply bg-crimson-500 text-white hover:bg-crimson-700;
+  }
+  .input {
+    @apply w-full rounded-lg border border-gold-500/20 bg-ink-950/60 px-3 py-2.5 text-stone-100 placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-gold-400/50;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .marquee-title {
+    @apply font-display tracking-[0.2em] text-gold-400;
+    text-shadow: 0 0 18px rgba(230, 178, 60, 0.4);
+  }
+}

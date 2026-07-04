@@ -1,0 +1,12 @@
+services:
+  marquee:
+    build: .
+    container_name: marquee
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    # Optional: set a fixed session secret (otherwise one is generated and stored in /data)
+    # environment:
+    #   - SESSION_SECRET=change-me-to-a-long-random-string
+    restart: unless-stopped
