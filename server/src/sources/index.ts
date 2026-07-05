@@ -1,3 +1,4 @@
+import { logger } from '../logger.js';
 import { getPlexConfig } from '../settings.js';
 import { fetchPlexData } from '../plex/sync.js';
 import { fetchJfData, getJfConfig } from '../jellyfin/client.js';
@@ -29,12 +30,16 @@ export async function syncAllSources(): Promise<{ results: SourceSyncResult[]; e
   const results: SourceSyncResult[] = [];
   const errors: string[] = [];
   for (const source of configured) {
+    const startedAt = Date.now();
     try {
       const data = source === 'plex' ? await fetchPlexData() : await fetchJfData(source);
       const written = writeSourceData(data);
       results.push({ source, sections: data.sections, ...written });
+      logger.info({ source, ...written, ms: Date.now() - startedAt }, 'library sync complete');
     } catch (err) {
-      errors.push(`${source}: ${err instanceof Error ? err.message : 'sync failed'}`);
+      const message = err instanceof Error ? err.message : 'sync failed';
+      errors.push(`${source}: ${message}`);
+      logger.error({ source, err: message }, 'library sync failed');
     }
   }
   if (!results.length) throw new Error(errors.join(' · '));

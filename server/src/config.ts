@@ -20,7 +20,19 @@ function loadSessionSecret(): string {
   return secret;
 }
 
+function readVersion(): string {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../package.json'), 'utf8')) as {
+      version?: string;
+    };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
 export const config = {
+  version: readVersion(),
   port: Number(process.env.PORT ?? 3000),
   host: process.env.HOST ?? '0.0.0.0',
   dataDir,

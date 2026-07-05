@@ -1,6 +1,8 @@
 import { eq } from 'drizzle-orm';
+import { decryptSecret, encryptSecret } from '../crypto.js';
 import { db } from '../db/index.js';
 import { media, users, userWatched } from '../db/schema.js';
+import { logger } from '../logger.js';
 import { getTraktApp, getWatched, refreshAccessToken, TraktAuthError, type TraktIds } from './client.js';
 
 // Pull the user's watched movies/shows from Trakt and match them against the
@@ -17,15 +19,16 @@ export async function refreshUserWatched(userId: number): Promise<number> {
   let movies: TraktIds[];
   let shows: TraktIds[];
   try {
-    [movies, shows] = await fetchAll(user.traktToken);
+    [movies, shows] = await fetchAll(decryptSecret(user.traktToken));
   } catch (err) {
     // Expired access token: refresh once and retry.
     if (!(err instanceof TraktAuthError) || !user.traktRefresh) throw err;
-    const renewed = await refreshAccessToken(app.clientId, app.clientSecret, user.traktRefresh);
+    const renewed = await refreshAccessToken(app.clientId, app.clientSecret, decryptSecret(user.traktRefresh));
     db.update(users)
-      .set({ traktToken: renewed.accessToken, traktRefresh: renewed.refreshToken })
+      .set({ traktToken: encryptSecret(renewed.accessToken), traktRefresh: encryptSecret(renewed.refreshToken) })
       .where(eq(users.id, userId))
       .run();
+    logger.info({ userId }, 'refreshed expired trakt token');
     [movies, shows] = await fetchAll(renewed.accessToken);
   }
 

@@ -3,8 +3,10 @@ import { runMigrations } from './db/index.js';
 import { buildApp } from './app.js';
 import { startDiscordBot } from './discord/bot.js';
 import { startScheduler } from './scheduler.js';
+import { migrateSecretsAtRest } from './settings.js';
 
 runMigrations();
+migrateSecretsAtRest();
 
 const app = await buildApp();
 startScheduler();

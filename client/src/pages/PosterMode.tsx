@@ -18,6 +18,7 @@ export function PosterMode() {
   const navigate = useNavigate();
   const [now, setNow] = useState(Date.now());
   const [idleIndex, setIdleIndex] = useState(0);
+  const [sessionIndex, setSessionIndex] = useState(0);
   const fetchedAtRef = useRef(Date.now());
 
   const { data } = useQuery({
@@ -56,8 +57,22 @@ export function PosterMode() {
     return () => clearInterval(timer);
   }, [idlePool, refetchIdle]);
 
-  const session = data?.sessions[0] ?? null;
-  const others = (data?.sessions.length ?? 0) - 1;
+  const sessions = data?.sessions ?? [];
+
+  // Carousel across simultaneous streams: auto-advance, keep the index valid
+  // as streams start and stop.
+  useEffect(() => {
+    if (sessionIndex >= sessions.length && sessionIndex !== 0) setSessionIndex(0);
+  }, [sessions.length, sessionIndex]);
+  useEffect(() => {
+    if (sessions.length < 2) return;
+    const timer = setInterval(() => {
+      setSessionIndex((i) => (i + 1) % sessions.length);
+    }, 12_000);
+    return () => clearInterval(timer);
+  }, [sessions.length]);
+
+  const session = sessions[sessionIndex] ?? sessions[0] ?? null;
   const idle = idlePool?.[idleIndex] ?? null;
 
   const elapsed = session
@@ -108,7 +123,7 @@ export function PosterMode() {
         {session ? '★ NOW PLAYING ★' : '★ NOW SHOWING ★'}
       </p>
 
-      <div className="w-[min(48vh,85vw)] transition-opacity duration-700" key={`${session?.title ?? ''}-${mediaId ?? title}`}>
+      <div className="fade-in w-[min(48vh,85vw)]" key={`${session?.title ?? ''}-${mediaId ?? title}`}>
         <Poster
           mediaId={mediaId}
           title={title}
@@ -124,7 +139,6 @@ export function PosterMode() {
             <>
               {session.year ?? ''}
               {session.user ? ` · for ${session.user}` : ''}
-              {others > 0 ? ` · +${others} more playing` : ''}
             </>
           ) : (
             <>
@@ -150,6 +164,22 @@ export function PosterMode() {
           </div>
         </div>
       )}
+      {sessions.length > 1 && (
+        <div className="flex items-center gap-2.5">
+          {sessions.map((s, i) => (
+            <button
+              key={`${s.source}-${s.title}-${i}`}
+              onClick={() => setSessionIndex(i)}
+              title={`${s.title}${s.user ? ` (${s.user})` : ''}`}
+              aria-label={`Show stream ${i + 1} of ${sessions.length}`}
+              className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                i === sessionIndex ? 'bg-neon-400' : 'bg-ink-700 hover:bg-neon-600'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
       {!session && <p className="text-xs tracking-widest text-stone-600 uppercase">From the library</p>}
     </div>
   );

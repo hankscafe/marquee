@@ -432,9 +432,18 @@ export function Admin() {
     },
   });
 
+  const { data: health } = useQuery({
+    queryKey: ['health'],
+    queryFn: () => api<{ ok: boolean; version: string }>('/api/health'),
+    staleTime: Infinity,
+  });
+
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl text-neon-300">Admin</h1>
+      <div className="flex items-baseline gap-3">
+        <h1 className="font-display text-2xl text-neon-300">Admin</h1>
+        {health?.version && <span className="text-xs text-stone-500">v{health.version}</span>}
+      </div>
 
       <div className="flex flex-wrap gap-1 rounded-xl border border-neon-500/15 bg-ink-800/80 p-1">
         {TABS.map((t) => (

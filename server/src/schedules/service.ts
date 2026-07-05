@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { media, scheduledPicks } from '../db/schema.js';
 import { announcePick } from '../discord/bot.js';
+import { logger } from '../logger.js';
 import { pickRandomMedia, type RandomFilters } from '../randomizer/service.js';
 
 type ScheduleRow = typeof scheduledPicks.$inferSelect;
@@ -26,6 +27,7 @@ export async function runSchedule(row: ScheduleRow): Promise<typeof media.$infer
     })
     .where(eq(scheduledPicks.id, row.id))
     .run();
+  logger.info({ schedule: row.name, pick: pick?.title ?? null }, 'scheduled pick ran');
   if (pick && row.postToDiscord) void announcePick(row.name, pick);
   return pick;
 }

@@ -146,7 +146,7 @@ export async function passkeyRoutes(app: FastifyInstance) {
   });
 
   // Login step 2: verify the assertion and start a session.
-  app.post('/api/auth/passkey/verify', async (request, reply) => {
+  app.post('/api/auth/passkey/verify', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const expectedChallenge = takeChallenge(request, reply, 'auth');
     if (!expectedChallenge) return reply.code(400).send({ error: 'Sign-in session expired — try again' });
     const response = request.body as AuthenticationResponseJSON;

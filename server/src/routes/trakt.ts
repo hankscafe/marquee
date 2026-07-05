@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { encryptSecret } from '../crypto.js';
 import { db } from '../db/index.js';
 import { users, userWatched } from '../db/schema.js';
 import { requireUser } from '../auth/plugin.js';
@@ -58,7 +59,7 @@ export async function traktRoutes(app: FastifyInstance) {
     if (result === 'pending') return { pending: true };
 
     db.update(users)
-      .set({ traktToken: result.accessToken, traktRefresh: result.refreshToken })
+      .set({ traktToken: encryptSecret(result.accessToken), traktRefresh: encryptSecret(result.refreshToken) })
       .where(eq(users.id, request.user!.id))
       .run();
 

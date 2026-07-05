@@ -30,6 +30,8 @@ export async function createSession(reply: FastifyReply, userId: number) {
     httpOnly: true,
     sameSite: 'lax',
     signed: true,
+    // Secure when served over TLS (trustProxy makes this reflect X-Forwarded-Proto)
+    secure: reply.request.protocol === 'https',
     maxAge: SESSION_TTL_MS / 1000,
   });
 }

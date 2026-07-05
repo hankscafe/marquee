@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { MediaFilters, MediaItem, PollDetail } from '@marquee/shared';
+import type { CollectionDetail, CollectionProgress, MediaFilters, MediaItem, PollDetail } from '@marquee/shared';
 import { api, ApiError } from '../api';
 import { Poster } from '../components/Poster';
 
@@ -18,9 +18,32 @@ export function NewPoll() {
 
   const [sectionFilter, setSectionFilter] = useState('');
   const [genreFilter, setGenreFilter] = useState('');
+  const [collectionPick, setCollectionPick] = useState('');
   const { data: libraryFilters } = useQuery({
     queryKey: ['media-filters'],
     queryFn: () => api<MediaFilters>('/api/media/filters'),
+  });
+  const { data: collectionsList } = useQuery({
+    queryKey: ['collections'],
+    queryFn: () => api<CollectionProgress[]>('/api/collections'),
+  });
+
+  // Fill the poll from a server collection in one click (capped at the 50-option poll limit).
+  const addCollection = useMutation({
+    mutationFn: (id: number) => api<CollectionDetail>(`/api/collections/${id}`),
+    onSuccess: (detail) => {
+      setSelected((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const merged = [...prev];
+        for (const item of detail.items) {
+          if (!seen.has(item.id)) merged.push(item);
+        }
+        if (merged.length > 50) setError('Polls support up to 50 options — extra titles were left out');
+        return merged.slice(0, 50);
+      });
+      setCollectionPick('');
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not load that collection'),
   });
 
   // With no search term, show a random sample of the library instead of A-to-Z.
@@ -118,6 +141,29 @@ export function NewPoll() {
 
       <div className="card p-5">
         <h2 className="mb-3 text-xs font-semibold tracking-widest text-neon-500 uppercase">Add from your library</h2>
+        {collectionsList && collectionsList.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            <select
+              className="input min-w-40 flex-1"
+              value={collectionPick}
+              onChange={(e) => setCollectionPick(e.target.value)}
+            >
+              <option value="">Add a whole collection…</option>
+              {collectionsList.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title} ({c.itemCount})
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn btn-ghost shrink-0"
+              disabled={!collectionPick || addCollection.isPending}
+              onClick={() => addCollection.mutate(Number(collectionPick))}
+            >
+              {addCollection.isPending ? 'Adding…' : 'Add collection'}
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           <input
             className="input min-w-40 flex-1"

@@ -2,8 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Fastify, { type FastifyError } from 'fastify';
 import fastifyCookie from '@fastify/cookie';
+import fastifyHelmet from '@fastify/helmet';
+import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import { config } from './config.js';
+import { logger } from './logger.js';
 import { authPlugin } from './auth/plugin.js';
 import { authRoutes } from './auth/routes.js';
 import { adminRoutes } from './routes/admin.js';
@@ -23,8 +26,16 @@ import { traktRoutes } from './routes/trakt.js';
 import { watchWithRoutes } from './routes/watchwith.js';
 
 export async function buildApp() {
-  const app = Fastify({ logger: { level: config.isProd ? 'info' : 'debug' } });
+  const app = Fastify({
+    loggerInstance: logger,
+    trustProxy: true, // honor X-Forwarded-* from the reverse proxy (needed for secure cookies + rate-limit IPs)
+  });
 
+  await app.register(fastifyHelmet, {
+    contentSecurityPolicy: false, // the SPA sets what it needs; CSP here would break inline Vite assets
+    crossOriginEmbedderPolicy: false,
+  });
+  await app.register(fastifyRateLimit, { global: false });
   await app.register(fastifyCookie, { secret: config.sessionSecret });
   await app.register(authPlugin);
   await app.register(authRoutes);
@@ -44,7 +55,7 @@ export async function buildApp() {
   await app.register(adminRoutes);
   await app.register(adminUserRoutes);
 
-  app.get('/api/health', async () => ({ ok: true }));
+  app.get('/api/health', async () => ({ ok: true, version: config.version }));
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     app.log.error(error);

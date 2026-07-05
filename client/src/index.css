@@ -17,6 +17,15 @@
   --font-display: Georgia, "Times New Roman", serif;
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 body {
   @apply bg-ink-900 text-stone-200 antialiased;
   background-image:
@@ -47,6 +56,9 @@ body {
   }
   .chip {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .fade-in {
+    animation: fade-in 0.7s ease;
   }
   .marquee-title {
     @apply font-display tracking-[0.2em] text-neon-400;

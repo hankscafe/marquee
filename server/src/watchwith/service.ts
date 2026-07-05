@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { decryptSecret } from '../crypto.js';
 import { db } from '../db/index.js';
 import { media, users } from '../db/schema.js';
 import { getSectionItems, getSections } from '../plex/client.js';
@@ -59,7 +60,7 @@ export async function watchedSetForUser(userId: number): Promise<{ set: Set<numb
 
   const user = db.select({ plexToken: users.plexToken }).from(users).where(eq(users.id, userId)).get();
   if (user?.plexToken) {
-    const set = await plexWatchedSet(userId, user.plexToken);
+    const set = await plexWatchedSet(userId, decryptSecret(user.plexToken));
     if (set) return { set, method: 'plex' };
   }
 

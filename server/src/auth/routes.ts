@@ -3,9 +3,11 @@ import { eq, sql } from 'drizzle-orm';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
 import { getOidcConfiguration, getOidcSettings, oidcRedirectUri } from './oidc.js';
+import { encryptSecret } from '../crypto.js';
 import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { authenticateJf, getJfConfig } from '../jellyfin/client.js';
+import { logger } from '../logger.js';
 import { buildAuthUrl, checkLoginPin, createLoginPin, getPlexAccount, hasServerAccess } from '../plex/plextv.js';
 import { getPlexConfig, getSetting } from '../settings.js';
 import { hashPassword, verifyPassword } from './passwords.js';
@@ -19,6 +21,9 @@ const credentialsSchema = z.object({
     .regex(/^[a-zA-Z0-9._-]+$/, 'Username may only contain letters, numbers, dots, dashes, and underscores'),
   password: z.string().min(8, 'Password must be at least 8 characters').max(200),
 });
+
+// Brute-force protection on credential endpoints.
+const AUTH_RATE = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 
 function userCount(): number {
   return db.select({ c: sql<number>`count(*)` }).from(users).get()!.c;
@@ -41,7 +46,7 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   // First-run: create the initial admin account.
-  app.post('/api/auth/setup', async (request, reply) => {
+  app.post('/api/auth/setup', { config: AUTH_RATE }, async (request, reply) => {
     if (userCount() > 0) return reply.code(403).send({ error: 'Setup has already been completed' });
     const parsed = credentialsSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
@@ -58,7 +63,7 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.code(201).send({ user });
   });
 
-  app.post('/api/auth/register', async (request, reply) => {
+  app.post('/api/auth/register', { config: AUTH_RATE }, async (request, reply) => {
     if (userCount() === 0) return reply.code(400).send({ error: 'Use setup to create the first admin account' });
     if (getSetting('auth.allowRegistration') === 'false') {
       return reply.code(403).send({ error: 'Registration is disabled on this server — ask your admin for an account' });
@@ -76,11 +81,12 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.code(201).send({ user });
   });
 
-  app.post('/api/auth/login', async (request, reply) => {
+  app.post('/api/auth/login', { config: AUTH_RATE }, async (request, reply) => {
     const parsed = z.object({ username: z.string(), password: z.string() }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
     const user = db.select().from(users).where(eq(users.username, parsed.data.username)).get();
     if (!user?.passwordHash || !verifyPassword(parsed.data.password, user.passwordHash)) {
+      logger.warn({ username: parsed.data.username, ip: request.ip }, 'failed login attempt');
       return reply.code(401).send({ error: 'Invalid username or password' });
     }
     await createSession(reply, user.id);
@@ -171,7 +177,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   // Username/password sign-in against the configured Jellyfin or Emby server.
   for (const kind of ['jellyfin', 'emby'] as const) {
-    app.post(`/api/auth/${kind}`, async (request, reply) => {
+    app.post(`/api/auth/${kind}`, { config: AUTH_RATE }, async (request, reply) => {
       if (userCount() === 0) return reply.code(400).send({ error: 'Complete first-run setup first' });
       const parsed = z.object({ username: z.string().min(1), password: z.string() }).safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
@@ -264,9 +270,11 @@ function upsertPlexUser(
   token: string,
 ): typeof users.$inferSelect {
   const plexId = String(account.id);
+  const storedToken = encryptSecret(token);
   const existing = db.select().from(users).where(eq(users.plexId, plexId)).get();
   if (existing) {
-    db.update(users).set({ plexToken: token, avatar: account.thumb }).where(eq(users.id, existing.id)).run();
+    db.update(users).set({ plexToken: storedToken, avatar: account.thumb }).where(eq(users.id, existing.id)).run();
+    logger.info({ userId: existing.id }, 'plex sign-in');
     return existing;
   }
   // Plex usernames may collide with existing local accounts — pick a free variant.
@@ -275,9 +283,11 @@ function upsertPlexUser(
   while (db.select({ id: users.id }).from(users).where(eq(users.username, username)).get()) {
     username = `${account.username}-${++suffix}`;
   }
-  return db
+  const created = db
     .insert(users)
-    .values({ username, passwordHash: null, plexId, plexToken: token, avatar: account.thumb })
+    .values({ username, passwordHash: null, plexId, plexToken: storedToken, avatar: account.thumb })
     .returning()
     .get();
+  logger.info({ userId: created.id, username }, 'new user created via plex sign-in');
+  return created;
 }

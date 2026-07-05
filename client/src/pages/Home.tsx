@@ -10,6 +10,24 @@ const statusChip: Record<string, string> = {
   closed: 'chip bg-violet-500/20 text-violet-400',
 };
 
+function PinIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="inline h-4 w-4 -translate-y-px text-neon-400"
+      aria-hidden="true"
+    >
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </svg>
+  );
+}
+
 // Poster that fills its (variable-width) container — used in the weighted strip.
 function PosterFill({ mediaId, title }: { mediaId: number | null; title: string }) {
   const [failed, setFailed] = useState(false);
@@ -37,7 +55,11 @@ function PollCard({ poll }: { poll: PollSummary }) {
     <Link to={`/p/${poll.shareToken}`} className="card block overflow-hidden transition-colors hover:border-neon-400/50">
       <div className="flex items-start justify-between gap-3 p-4 pb-2">
         <h3 className="font-display text-lg text-stone-100">
-          {poll.pinned && <span title="Pinned">📌 </span>}
+          {poll.pinned && (
+            <span title="Pinned" className="mr-1.5">
+              <PinIcon />
+            </span>
+          )}
           {poll.title}
         </h3>
         <span className={statusChip[poll.status]}>{poll.status}</span>

@@ -13,6 +13,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { pollOptions, polls, users, votes } from '../db/schema.js';
 import { emitPollUpdate } from '../events.js';
+import { logger } from '../logger.js';
 import { getSetting } from '../settings.js';
 
 // Discord integration: post a poll as an embed with one button per option,
@@ -48,10 +49,12 @@ export async function startDiscordBot(): Promise<void> {
   const c = new Client({ intents: [GatewayIntentBits.Guilds] });
   c.on(Events.ClientReady, (ready) => {
     botUser = ready.user.tag;
+    logger.info({ botUser }, 'discord bot connected');
   });
   c.on(Events.InteractionCreate, (interaction) => {
     handleInteraction(interaction).catch((err) => {
       lastError = err instanceof Error ? err.message : String(err);
+      logger.warn({ err: lastError }, 'discord interaction failed');
     });
   });
   try {
@@ -59,6 +62,7 @@ export async function startDiscordBot(): Promise<void> {
     client = c;
   } catch (err) {
     lastError = err instanceof Error ? err.message : 'Discord login failed';
+    logger.error({ err: lastError }, 'discord bot login failed');
     await c.destroy().catch(() => {});
   }
 }

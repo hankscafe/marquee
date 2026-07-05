@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { db } from '../db/index.js';
 import { media, users } from '../db/schema.js';
 import { requireUser } from '../auth/plugin.js';
+import { decryptSecret } from '../crypto.js';
 import { getSeerrConfig } from '../seerr/client.js';
 import { dedupeMedia } from '../sources/dedupe.js';
 import { fetchWatchlist, watchedSetForUser, watchlistKey } from '../watchwith/service.js';
@@ -76,8 +77,8 @@ export async function watchWithRoutes(app: FastifyInstance) {
     let overlap;
     try {
       const [myList, theirList] = await Promise.all([
-        fetchWatchlist(me.plexToken),
-        fetchWatchlist(partner.plexToken),
+        fetchWatchlist(decryptSecret(me.plexToken)),
+        fetchWatchlist(decryptSecret(partner.plexToken)),
       ]);
       const theirKeys = new Set(theirList.map(watchlistKey));
       overlap = myList.filter((item) => theirKeys.has(watchlistKey(item)));

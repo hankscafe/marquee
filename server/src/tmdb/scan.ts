@@ -1,5 +1,6 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { db } from '../db/index.js';
+import { logger } from '../logger.js';
 import { media, tmdbCollectionParts, tmdbCollections } from '../db/schema.js';
 import { getCollectionParts, getMovieCollectionRef, getTmdbKey, type TmdbCollectionRef } from './client.js';
 
@@ -117,8 +118,13 @@ async function runScan(key: string, pending: { id: number; tmdbId: string | null
     }
   } catch (err) {
     state.lastError = err instanceof Error ? err.message : String(err);
+    logger.error({ err: state.lastError }, 'franchise scan failed');
   } finally {
     state.running = false;
     state.finishedAt = new Date().toISOString();
+    logger.info(
+      { processed: state.processed, franchises: state.franchisesFound, errors: state.errors },
+      'franchise scan finished',
+    );
   }
 }
