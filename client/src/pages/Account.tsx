@@ -66,7 +66,7 @@ export function Account() {
             {keys.map((k) => (
               <li key={k.id} className="flex items-center justify-between gap-2 rounded-lg border border-neon-500/10 px-3 py-2">
                 <div>
-                  <p className="text-sm text-stone-100">🔑 {k.name}</p>
+                  <p className="text-sm text-stone-100">{k.name}</p>
                   <p className="text-xs text-stone-500">
                     Added {new Date(k.createdAt).toLocaleDateString()}
                     {k.lastUsedAt ? ` · last used ${new Date(k.lastUsedAt).toLocaleDateString()}` : ' · never used'}

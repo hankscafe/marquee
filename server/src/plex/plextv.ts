@@ -35,12 +35,14 @@ export async function createLoginPin(): Promise<{ id: number; code: string }> {
   return { id: json.id, code: json.code };
 }
 
-export function buildAuthUrl(code: string): string {
+export function buildAuthUrl(code: string, forwardUrl?: string): string {
   const params = new URLSearchParams({
     clientID: getClientId(),
     code,
     'context[device][product]': 'Marquee',
   });
+  // After approval, plex.tv redirects the window here (lets the popup close itself).
+  if (forwardUrl) params.set('forwardUrl', forwardUrl);
   return `https://app.plex.tv/auth#?${params.toString()}`;
 }
 

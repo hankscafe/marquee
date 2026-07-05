@@ -143,7 +143,7 @@ export function NewPoll() {
           </select>
           {!query && (
             <button className="btn btn-ghost shrink-0" onClick={() => refetch()} title="Show a different random sample">
-              🎲 Shuffle
+              Shuffle
             </button>
           )}
         </div>

@@ -253,7 +253,7 @@ export function Randomizer() {
             spin.mutate();
           }}
         >
-          {spinning || spin.isPending ? 'Drawing…' : pick ? '🎬 Spin again' : '🎬 Spin'}
+          {spinning || spin.isPending ? 'Drawing…' : pick ? 'Spin again' : 'Spin'}
         </button>
         {error && <p className="text-sm text-crimson-500">{error}</p>}
       </div>

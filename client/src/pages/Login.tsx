@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { startAuthentication } from '@simplewebauthn/browser';
@@ -16,9 +16,17 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [plexPinId, setPlexPinId] = useState<number | null>(null);
   const [accountKind, setAccountKind] = useState<'local' | 'jellyfin' | 'emby'>('local');
+  const plexPopup = useRef<Window | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Plex redirects its popup back here with ?plexDone=1 — close it; the opener
+  // tab detects the completed sign-in through its own polling.
+  const isPlexDone = searchParams.get('plexDone') === '1';
+  useEffect(() => {
+    if (isPlexDone) window.close();
+  }, [isPlexDone]);
 
   // Failed OIDC round-trips land back here with the reason in the query string.
   useEffect(() => {
@@ -46,6 +54,7 @@ export function Login() {
         const res = await api<{ pending?: boolean }>('/api/auth/plex/complete', { body: { pinId: plexPinId } });
         if (cancelled) return;
         if (!res.pending) {
+          plexPopup.current?.close();
           await queryClient.invalidateQueries({ queryKey: ['auth'] });
           navigate('/');
           return;
@@ -88,7 +97,7 @@ export function Login() {
     setError(null);
     try {
       const res = await api<{ pinId: number; authUrl: string }>('/api/auth/plex/start', { body: {} });
-      window.open(res.authUrl, '_blank', 'noopener');
+      plexPopup.current = window.open(res.authUrl, 'plex-signin', 'popup=yes,width=600,height=760');
       setPlexPinId(res.pinId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not start Plex sign-in');
@@ -110,6 +119,13 @@ export function Login() {
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong'),
   });
 
+  if (isPlexDone) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <p className="text-stone-300">Signed in with Plex — you can close this window.</p>
+      </div>
+    );
+  }
   if (isLoading) return null;
   if (data?.user) return <Navigate to="/" replace />;
 
@@ -231,7 +247,7 @@ export function Login() {
                 }}
                 disabled={passkeyLogin.isPending}
               >
-                🔑 Sign in with a passkey
+                Sign in with a passkey
               </button>
               {data?.authMethods?.oidc && (
                 <button
@@ -241,7 +257,7 @@ export function Login() {
                     window.location.href = '/api/auth/oidc/start';
                   }}
                 >
-                  🔐 Sign in with {data.authMethods.oidcLabel ?? 'SSO'}
+                  Sign in with {data.authMethods.oidcLabel ?? 'SSO'}
                 </button>
               )}
               {data?.authMethods?.plex && (
@@ -252,7 +268,7 @@ export function Login() {
                     onClick={startPlexLogin}
                     disabled={plexPinId !== null}
                   >
-                    {plexPinId !== null ? 'Waiting for Plex — approve in the new tab…' : '▶ Sign in with Plex'}
+                    {plexPinId !== null ? 'Waiting for Plex — approve in the popup…' : 'Sign in with Plex'}
                   </button>
                   {plexPinId !== null && (
                     <button
@@ -265,16 +281,18 @@ export function Login() {
                   )}
                 </>
               )}
-              <button
-                type="button"
-                className="w-full text-center text-sm text-stone-400 hover:text-neon-300"
-                onClick={() => {
-                  setError(null);
-                  setMode(activeMode === 'login' ? 'register' : 'login');
-                }}
-              >
-                {activeMode === 'login' ? 'New here? Create an account' : 'Already have an account? Sign in'}
-              </button>
+              {(data?.authMethods?.allowRegistration || activeMode === 'register') && (
+                <button
+                  type="button"
+                  className="w-full text-center text-sm text-stone-400 hover:text-neon-300"
+                  onClick={() => {
+                    setError(null);
+                    setMode(activeMode === 'login' ? 'register' : 'login');
+                  }}
+                >
+                  {activeMode === 'login' ? 'New here? Create an account' : 'Already have an account? Sign in'}
+                </button>
+              )}
             </>
           )}
         </form>

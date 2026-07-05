@@ -7,7 +7,7 @@ import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { authenticateJf, getJfConfig } from '../jellyfin/client.js';
 import { buildAuthUrl, checkLoginPin, createLoginPin, getPlexAccount, hasServerAccess } from '../plex/plextv.js';
-import { getPlexConfig } from '../settings.js';
+import { getPlexConfig, getSetting } from '../settings.js';
 import { hashPassword, verifyPassword } from './passwords.js';
 import { createSession, destroySession } from './plugin.js';
 
@@ -35,6 +35,7 @@ export async function authRoutes(app: FastifyInstance) {
         emby: !!getJfConfig('emby'),
         oidc: !!getOidcSettings(),
         oidcLabel: getOidcSettings()?.label ?? null,
+        allowRegistration: getSetting('auth.allowRegistration') !== 'false',
       },
     };
   });
@@ -59,6 +60,9 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post('/api/auth/register', async (request, reply) => {
     if (userCount() === 0) return reply.code(400).send({ error: 'Use setup to create the first admin account' });
+    if (getSetting('auth.allowRegistration') === 'false') {
+      return reply.code(403).send({ error: 'Registration is disabled on this server — ask your admin for an account' });
+    }
     const parsed = credentialsSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
     const existing = db.select({ id: users.id }).from(users).where(eq(users.username, parsed.data.username)).get();
@@ -210,11 +214,12 @@ export async function authRoutes(app: FastifyInstance) {
   }
 
   // "Sign in with Plex" step 1: create a PIN and hand back the approval URL.
-  app.post('/api/auth/plex/start', async (_request, reply) => {
+  app.post('/api/auth/plex/start', async (request, reply) => {
     if (userCount() === 0) return reply.code(400).send({ error: 'Complete first-run setup before signing in with Plex' });
     try {
       const pin = await createLoginPin();
-      return { pinId: pin.id, code: pin.code, authUrl: buildAuthUrl(pin.code) };
+      const origin = getSetting('app.url')?.replace(/\/+$/, '') ?? `${request.protocol}://${request.headers.host}`;
+      return { pinId: pin.id, code: pin.code, authUrl: buildAuthUrl(pin.code, `${origin}/login?plexDone=1`) };
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not reach plex.tv' });
     }

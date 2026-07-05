@@ -77,6 +77,7 @@ export async function adminRoutes(app: FastifyInstance) {
     seerrUrl: getSetting('seerr.url'),
     seerrKind: getSetting('seerr.kind') === 'ombi' ? ('ombi' as const) : ('overseerr' as const),
     seerrKeySet: !!getSetting('seerr.apiKey'),
+    allowRegistration: getSetting('auth.allowRegistration') !== 'false',
   });
 
   app.get('/api/admin/settings', { preHandler: requireAdmin }, async () => settingsPayload());
@@ -103,6 +104,7 @@ export async function adminRoutes(app: FastifyInstance) {
         seerrUrl: z.string().url('Enter a valid request-service URL').optional(),
         seerrApiKey: z.string().optional(),
         seerrKind: z.enum(['overseerr', 'ombi']).optional(),
+        allowRegistration: z.boolean().optional(),
       })
       .safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
@@ -131,6 +133,9 @@ export async function adminRoutes(app: FastifyInstance) {
     if (parsed.data.seerrUrl) setSetting('seerr.url', parsed.data.seerrUrl);
     if (parsed.data.seerrApiKey) setSetting('seerr.apiKey', parsed.data.seerrApiKey.trim());
     if (parsed.data.seerrKind) setSetting('seerr.kind', parsed.data.seerrKind);
+    if (parsed.data.allowRegistration !== undefined) {
+      setSetting('auth.allowRegistration', String(parsed.data.allowRegistration));
+    }
     return settingsPayload();
   });
 

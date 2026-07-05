@@ -134,7 +134,7 @@ export function WatchWith() {
           disabled={!partnerId || spin.isPending}
           onClick={() => spin.mutate()}
         >
-          {spin.isPending ? 'Consulting the marquee…' : '🎬 Pick for us'}
+          {spin.isPending ? 'Consulting the marquee…' : 'Pick for us'}
         </button>
         {error && <p className="text-center text-sm text-crimson-500">{error}</p>}
       </div>

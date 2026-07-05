@@ -30,7 +30,7 @@ export function MediaFacts({ item }: { item: MediaItem }) {
       <div className="flex flex-wrap gap-2 pt-2">
         {item.watchUrl && (
           <a href={item.watchUrl} target="_blank" rel="noreferrer" className="btn btn-neon">
-            ▶ Watch on {item.source === 'plex' ? 'Plex' : item.source === 'jellyfin' ? 'Jellyfin' : 'Emby'}
+            Watch on {item.source === 'plex' ? 'Plex' : item.source === 'jellyfin' ? 'Jellyfin' : 'Emby'}
           </a>
         )}
         <a
@@ -41,7 +41,7 @@ export function MediaFacts({ item }: { item: MediaItem }) {
           rel="noreferrer"
           className="btn btn-ghost"
         >
-          🎞 Trailer
+          Trailer
         </a>
       </div>
     </div>

@@ -35,6 +35,10 @@ function UsersPanel() {
     queryKey: ['admin', 'users'],
     queryFn: () => api<AdminUserInfo[]>('/api/admin/users'),
   });
+  const { data: settings } = useQuery({
+    queryKey: ['admin', 'settings'],
+    queryFn: () => api<AdminSettings>('/api/admin/settings'),
+  });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
   const onError = (err: unknown) => setMessage(err instanceof ApiError ? `✗ ${err.message}` : '✗ Something went wrong');
 
@@ -85,6 +89,13 @@ function UsersPanel() {
     onError,
   });
 
+  const setRegistration = useMutation({
+    mutationFn: (allowRegistration: boolean) =>
+      api<AdminSettings>('/api/admin/settings', { method: 'PUT', body: { allowRegistration } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'settings'] }),
+    onError,
+  });
+
   const badges = (u: AdminUserInfo) =>
     [
       u.hasPassword && 'password',
@@ -97,13 +108,30 @@ function UsersPanel() {
 
   return (
     <>
+      <section className="card space-y-2 p-5">
+        <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Access</h2>
+        <label className="flex items-center gap-2 text-sm text-stone-300">
+          <input
+            type="checkbox"
+            checked={settings?.allowRegistration ?? true}
+            disabled={setRegistration.isPending || !settings}
+            onChange={(e) => setRegistration.mutate(e.target.checked)}
+            className="accent-neon-400"
+          />
+          Allow anyone to create an account on the login page
+        </label>
+        <p className="text-sm text-stone-500">
+          When off, only accounts you create or import (or Plex/SSO sign-ins) can get in.
+        </p>
+      </section>
+
       <section className="card space-y-4 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">
             Users {userList ? `(${userList.length})` : ''}
           </h2>
           <button className="btn btn-ghost" disabled={importPlex.isPending} onClick={() => importPlex.mutate()}>
-            {importPlex.isPending ? 'Importing…' : '⬇ Import Plex users'}
+            {importPlex.isPending ? 'Importing…' : 'Import Plex users'}
           </button>
         </div>
         <p className="text-sm text-stone-400">

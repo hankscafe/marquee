@@ -111,7 +111,7 @@ export function PollPage() {
           </button>
           {auth?.user?.isAdmin && (
             <button className="btn btn-ghost" disabled={togglePin.isPending} onClick={() => togglePin.mutate(!poll.pinned)}>
-              {poll.pinned ? '📌 Unpin' : '📌 Pin'}
+              {poll.pinned ? 'Unpin' : 'Pin'}
             </button>
           )}
           {poll.isOwner && poll.status === 'draft' && (

@@ -343,7 +343,7 @@ export function Collections() {
               disabled={spinUnwatched.isPending}
               onClick={() => spinUnwatched.mutate(detail.id)}
             >
-              🎬 Spin an unwatched one
+              Spin an unwatched one
             </button>
           </div>
           {spinError && <p className="text-sm text-crimson-500">{spinError}</p>}

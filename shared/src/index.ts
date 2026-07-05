@@ -17,6 +17,7 @@ export interface AuthStatus {
     emby: boolean;
     oidc: boolean;
     oidcLabel: string | null;
+    allowRegistration: boolean;
   };
 }
 
@@ -169,6 +170,7 @@ export interface AdminSettings {
   seerrUrl: string | null;
   seerrKind: 'overseerr' | 'ombi';
   seerrKeySet: boolean;
+  allowRegistration: boolean;
 }
 
 export interface DiscordStatus {
