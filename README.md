@@ -43,7 +43,7 @@ Self-hosted movie night polls and randomizer for your Plex server. Build a poll 
 **Auth**
 - [x] Sign in with Plex (PIN/OAuth flow; only accounts with access to the configured server may join)
 - [x] Jellyfin / Emby account login (username/password against the configured server)
-- [x] Plex Managed Users — household sign-in with member tiles and optional PIN
+- [x] Plex Managed Users — importable as accounts (Admin → Users); household sign-in tiles were removed by design, since a public login page must not list household members. Admins set passwords for family accounts instead.
 - [x] OIDC login (Authentik / Authelia / Keycloak / any compliant provider) — authorization-code flow with PKCE, admin-configurable, custom button label
 - [x] Passkeys (WebAuthn) — register from the Account page, usernameless sign-in from the login page; requires HTTPS (or localhost)
 

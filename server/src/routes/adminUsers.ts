@@ -68,14 +68,25 @@ export async function adminUserRoutes(app: FastifyInstance) {
 
   app.patch('/api/admin/users/:id', { preHandler: requireAdmin }, async (request, reply) => {
     const id = Number((request.params as { id: string }).id);
-    const parsed = z.object({ isAdmin: z.boolean() }).safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
+    const parsed = z
+      .object({
+        isAdmin: z.boolean().optional(),
+        password: z.string().min(8, 'Password must be at least 8 characters').max(200).optional(),
+      })
+      .safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
     const user = db.select().from(users).where(eq(users.id, id)).get();
     if (!user) return reply.code(404).send({ error: 'User not found' });
-    if (user.id === request.user!.id && !parsed.data.isAdmin) {
+    if (user.id === request.user!.id && parsed.data.isAdmin === false) {
       return reply.code(400).send({ error: 'You cannot remove your own admin role' });
     }
-    db.update(users).set({ isAdmin: parsed.data.isAdmin }).where(eq(users.id, id)).run();
+    db.update(users)
+      .set({
+        ...(parsed.data.isAdmin !== undefined ? { isAdmin: parsed.data.isAdmin } : {}),
+        ...(parsed.data.password ? { passwordHash: hashPassword(parsed.data.password) } : {}),
+      })
+      .where(eq(users.id, id))
+      .run();
     return serializeUser(db.select().from(users).where(eq(users.id, id)).get()!);
   });
 

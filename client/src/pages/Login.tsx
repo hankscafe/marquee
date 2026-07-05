@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { startAuthentication } from '@simplewebauthn/browser';
-import type { PlexHomeUserInfo } from '@marquee/shared';
 import { api, ApiError } from '../api';
 import { useAuth } from '../auth';
 
@@ -17,9 +16,6 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [plexPinId, setPlexPinId] = useState<number | null>(null);
   const [accountKind, setAccountKind] = useState<'local' | 'jellyfin' | 'emby'>('local');
-  const [homeUsers, setHomeUsers] = useState<PlexHomeUserInfo[] | null>(null);
-  const [homeUser, setHomeUser] = useState<PlexHomeUserInfo | null>(null);
-  const [homePin, setHomePin] = useState('');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -86,25 +82,6 @@ export function Login() {
       if (err instanceof Error && err.name === 'NotAllowedError') return; // user dismissed the prompt
       setError(err instanceof ApiError ? err.message : 'Passkey sign-in failed');
     },
-  });
-
-  const loadHomeUsers = useMutation({
-    mutationFn: () => api<PlexHomeUserInfo[]>('/api/auth/plexhome/users'),
-    onSuccess: (list) => {
-      setError(null);
-      setHomeUsers(list);
-    },
-    onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not load household members'),
-  });
-
-  const homeLogin = useMutation({
-    mutationFn: (member: PlexHomeUserInfo) =>
-      api('/api/auth/plexhome/login', { body: { homeUserId: member.id, pin: homePin || undefined } }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['auth'] });
-      navigate('/');
-    },
-    onError: (err) => setError(err instanceof ApiError ? err.message : 'Household sign-in failed'),
   });
 
   const startPlexLogin = async () => {
@@ -285,59 +262,6 @@ export function Login() {
                     >
                       Cancel Plex sign-in
                     </button>
-                  )}
-                  {homeUsers === null ? (
-                    <button
-                      type="button"
-                      className="btn btn-ghost w-full"
-                      disabled={loadHomeUsers.isPending}
-                      onClick={() => loadHomeUsers.mutate()}
-                    >
-                      👪 Household sign-in
-                    </button>
-                  ) : homeUsers.length === 0 ? (
-                    <p className="text-center text-sm text-stone-500">No Plex Home members found on this server.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap justify-center gap-2">
-                        {homeUsers.map((member) => (
-                          <button
-                            key={member.id}
-                            type="button"
-                            className={`btn ${homeUser?.id === member.id ? 'btn-neon' : 'btn-ghost'}`}
-                            onClick={() => {
-                              setError(null);
-                              setHomeUser(member);
-                              setHomePin('');
-                              if (!member.protected) homeLogin.mutate(member);
-                            }}
-                          >
-                            {member.title}
-                            {member.protected ? ' 🔒' : ''}
-                          </button>
-                        ))}
-                      </div>
-                      {homeUser?.protected && (
-                        <div className="flex gap-2">
-                          <input
-                            className="input flex-1"
-                            type="password"
-                            inputMode="numeric"
-                            placeholder={`PIN for ${homeUser.title}`}
-                            value={homePin}
-                            onChange={(e) => setHomePin(e.target.value)}
-                          />
-                          <button
-                            type="button"
-                            className="btn btn-neon shrink-0"
-                            disabled={homeLogin.isPending || !homePin}
-                            onClick={() => homeLogin.mutate(homeUser)}
-                          >
-                            Sign in
-                          </button>
-                        </div>
-                      )}
-                    </div>
                   )}
                 </>
               )}

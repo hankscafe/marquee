@@ -69,6 +69,16 @@ function UsersPanel() {
     onError,
   });
 
+  const setPassword = useMutation({
+    mutationFn: ({ id, password }: { id: number; password: string }) =>
+      api(`/api/admin/users/${id}`, { method: 'PATCH', body: { password } }),
+    onSuccess: () => {
+      setMessage('✓ Password set — they can sign in with username + password now');
+      refresh();
+    },
+    onError,
+  });
+
   const removeUser = useMutation({
     mutationFn: (id: number) => api(`/api/admin/users/${id}`, { method: 'DELETE' }),
     onSuccess: refresh,
@@ -116,6 +126,15 @@ function UsersPanel() {
               </div>
               {u.id !== auth?.user?.id && (
                 <div className="flex gap-1">
+                  <button
+                    className="btn btn-ghost px-3 py-1 text-xs"
+                    onClick={() => {
+                      const password = window.prompt(`New password for ${u.username} (min 8 characters):`);
+                      if (password) setPassword.mutate({ id: u.id, password });
+                    }}
+                  >
+                    {u.hasPassword ? 'Reset password' : 'Set password'}
+                  </button>
                   <button
                     className="btn btn-ghost px-3 py-1 text-xs"
                     onClick={() => toggleAdmin.mutate({ id: u.id, isAdmin: !u.isAdmin })}

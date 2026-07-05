@@ -63,9 +63,9 @@ export async function getPlexAccount(
   return { id: json.id, username: json.username || json.title || `plex-${json.id}`, thumb: json.thumb ?? null };
 }
 
-// Plex Home ("managed users"): list household members and switch to one,
-// using the server owner's token. Managed users have no email/password —
-// just an optional 4-digit PIN.
+// Plex Home ("managed users"): listed for the admin user-import only.
+// Household sign-in was removed by design — a public login page must not
+// enumerate household members.
 export interface PlexHomeUser {
   id: number;
   title: string;
@@ -80,17 +80,6 @@ export async function getHomeUsers(ownerToken: string): Promise<PlexHomeUser[]> 
   if (!res.ok) throw new Error(`plex.tv home-users request failed (${res.status})`);
   const json = (await res.json()) as PlexHomeUser[] | { users?: PlexHomeUser[] };
   return Array.isArray(json) ? json : (json.users ?? []);
-}
-
-export async function switchToHomeUser(ownerToken: string, homeUserId: number, pin?: string): Promise<string> {
-  const url = new URL(`${PLEX_TV}/api/v2/home/users/${homeUserId}/switch`);
-  if (pin) url.searchParams.set('pin', pin);
-  const res = await fetch(url, { method: 'POST', headers: { ...plexTvHeaders(), 'X-Plex-Token': ownerToken } });
-  if (res.status === 401 || res.status === 403) throw new Error('INVALID_PIN');
-  if (!res.ok) throw new Error(`plex.tv switch request failed (${res.status})`);
-  const json = (await res.json()) as { authToken?: string };
-  if (!json.authToken) throw new Error('plex.tv returned no token for that user');
-  return json.authToken;
 }
 
 // Friends (accounts the owner shares the server with), for user import.

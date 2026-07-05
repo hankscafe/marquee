@@ -6,15 +6,7 @@ import { getOidcConfiguration, getOidcSettings, oidcRedirectUri } from './oidc.j
 import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { authenticateJf, getJfConfig } from '../jellyfin/client.js';
-import {
-  buildAuthUrl,
-  checkLoginPin,
-  createLoginPin,
-  getHomeUsers,
-  getPlexAccount,
-  hasServerAccess,
-  switchToHomeUser,
-} from '../plex/plextv.js';
+import { buildAuthUrl, checkLoginPin, createLoginPin, getPlexAccount, hasServerAccess } from '../plex/plextv.js';
 import { getPlexConfig } from '../settings.js';
 import { hashPassword, verifyPassword } from './passwords.js';
 import { createSession, destroySession } from './plugin.js';
@@ -259,46 +251,6 @@ export async function authRoutes(app: FastifyInstance) {
     return { user: { id: user.id, username: user.username, isAdmin: user.isAdmin } };
   });
 
-  // Plex Home: list household members so they can pick their name on the login page.
-  app.get('/api/auth/plexhome/users', async (_request, reply) => {
-    if (userCount() === 0) return reply.code(400).send({ error: 'Complete first-run setup first' });
-    const cfg = getPlexConfig();
-    if (!cfg) return reply.code(503).send({ error: 'Plex is not configured on this server' });
-    try {
-      const list = await getHomeUsers(cfg.token);
-      return list.map((u) => ({ id: u.id, title: u.title, protected: !!u.protected, restricted: !!u.restricted }));
-    } catch (err) {
-      return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not reach plex.tv' });
-    }
-  });
-
-  // Plex Home: switch to the chosen member (with their PIN if set) and sign them in.
-  app.post('/api/auth/plexhome/login', async (request, reply) => {
-    if (userCount() === 0) return reply.code(400).send({ error: 'Complete first-run setup first' });
-    const parsed = z.object({ homeUserId: z.number().int(), pin: z.string().max(10).optional() }).safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
-    const cfg = getPlexConfig();
-    if (!cfg) return reply.code(503).send({ error: 'Plex is not configured on this server' });
-
-    let token: string;
-    try {
-      token = await switchToHomeUser(cfg.token, parsed.data.homeUserId, parsed.data.pin);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Switch failed';
-      if (message === 'INVALID_PIN') return reply.code(401).send({ error: 'Incorrect PIN' });
-      return reply.code(502).send({ error: message });
-    }
-
-    let account;
-    try {
-      account = await getPlexAccount(token);
-    } catch (err) {
-      return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not reach plex.tv' });
-    }
-    const user = upsertPlexUser(account, token);
-    await createSession(reply, user.id);
-    return { user: { id: user.id, username: user.username, isAdmin: user.isAdmin } };
-  });
 }
 
 // Find-or-create the Marquee account for a plex.tv identity (regular or managed).
