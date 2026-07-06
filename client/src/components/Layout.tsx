@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth';
+import { MarqueeLogo } from './MarqueeLogo';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-lg px-3 py-2 text-sm transition-colors ${
@@ -13,8 +14,8 @@ export function Layout() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-neon-500/15 bg-ink-950/85 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
-          <Link to="/" className="marquee-title text-xl sm:text-2xl">
-            ★ MARQUEE ★
+          <Link to="/" className="text-sm sm:text-base">
+            <MarqueeLogo />
           </Link>
           <nav className="ml-auto flex flex-wrap items-center gap-1">
             <NavLink to="/" end className={navLinkClass}>

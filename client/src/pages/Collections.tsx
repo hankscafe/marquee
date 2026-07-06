@@ -12,6 +12,7 @@ import type {
 import { api, ApiError } from '../api';
 import { useAuth } from '../auth';
 import { MediaFacts } from '../components/MediaDetails';
+import { Modal } from '../components/Modal';
 import { Poster } from '../components/Poster';
 
 function Franchises() {
@@ -62,12 +63,10 @@ function Franchises() {
             <button
               key={f.id}
               onClick={() => {
-                setSelectedId(f.id === selectedId ? null : f.id);
+                setSelectedId(f.id);
                 setMessage(null);
               }}
-              className={`card p-4 text-left transition-colors hover:border-neon-400/50 ${
-                selectedId === f.id ? 'ring-2 ring-neon-400' : ''
-              }`}
+              className="card p-4 text-left transition-colors hover:border-neon-400/50"
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="font-display text-lg text-stone-100">{f.name}</p>
@@ -84,12 +83,14 @@ function Franchises() {
         })}
       </div>
 
-      {detail && (
-        <div className="card space-y-4 p-5">
-          <h3 className="font-display text-xl text-stone-100">{detail.name}</h3>
-          {message && <p className="text-sm text-stone-300">{message}</p>}
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6">
-            {detail.parts.map((p) => (
+      {selectedId !== null && (
+        <Modal wide onClose={() => setSelectedId(null)}>
+          {detail ? (
+            <div className="space-y-4">
+              <h3 className="font-display text-xl text-stone-100">{detail.name}</h3>
+              {message && <p className="text-sm text-stone-300">{message}</p>}
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6">
+                {detail.parts.map((p) => (
               <div key={p.tmdbMovieId} className={p.inLibrary ? '' : 'opacity-90'}>
                 {p.inLibrary && p.mediaId ? (
                   <Poster mediaId={p.mediaId} title={p.title} className="rounded-lg" />
@@ -124,9 +125,16 @@ function Franchises() {
                   <p className="text-xs text-stone-500">Missing</p>
                 )}
               </div>
-            ))}
-          </div>
-        </div>
+                ))}
+              </div>
+              <button className="btn btn-ghost w-full" onClick={() => setSelectedId(null)}>
+                Close
+              </button>
+            </div>
+          ) : (
+            <p className="text-stone-400">Loading…</p>
+          )}
+        </Modal>
       )}
     </section>
   );
@@ -313,13 +321,11 @@ export function Collections() {
             <button
               key={c.id}
               onClick={() => {
-                setSelectedId(c.id === selectedId ? null : c.id);
+                setSelectedId(c.id);
                 setPick(null);
                 setSpinError(null);
               }}
-              className={`card p-4 text-left transition-colors hover:border-neon-400/50 ${
-                selectedId === c.id ? 'ring-2 ring-neon-400' : ''
-              }`}
+              className="card p-4 text-left transition-colors hover:border-neon-400/50"
             >
               <p className="font-display text-lg text-stone-100">{c.title}</p>
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-700">
@@ -334,48 +340,57 @@ export function Collections() {
         })}
       </div>
 
-      {detail && (
-        <div className="card space-y-4 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-xl text-stone-100">{detail.title}</h2>
-            <button
-              className="btn btn-neon"
-              disabled={spinUnwatched.isPending}
-              onClick={() => spinUnwatched.mutate(detail.id)}
-            >
-              Spin an unwatched one
-            </button>
-          </div>
-          {spinError && <p className="text-sm text-crimson-500">{spinError}</p>}
-          {pick && (
-            <div className="flex flex-col gap-4 rounded-lg border border-neon-400/40 bg-ink-950/50 p-4 sm:flex-row">
-              <div className="mx-auto w-32 shrink-0 sm:mx-0">
-                <Poster mediaId={pick.id} title={pick.title} className="rounded-lg" />
+      {selectedId !== null && (
+        <Modal wide onClose={() => setSelectedId(null)}>
+          {detail ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="font-display text-xl text-stone-100">{detail.title}</h2>
+                <button
+                  className="btn btn-neon"
+                  disabled={spinUnwatched.isPending}
+                  onClick={() => spinUnwatched.mutate(detail.id)}
+                >
+                  Spin an unwatched one
+                </button>
               </div>
-              <div className="min-w-0 flex-1 space-y-2">
-                <p className="marquee-title text-xl">{pick.title}</p>
-                <MediaFacts item={pick} />
-              </div>
-            </div>
-          )}
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6">
-            {detail.items.map((m) => (
-              <div key={m.id} className={m.watchedByMe ? 'opacity-45' : ''} title={m.watchedByMe ? 'Watched' : 'Not watched yet'}>
-                <div className="relative">
-                  <Poster mediaId={m.id} title={m.title} className="rounded-lg" />
-                  {m.watchedByMe && (
-                    <span className="absolute top-1.5 right-1.5 rounded-full bg-ink-950/85 px-1.5 py-0.5 text-xs text-neon-300">
-                      ✓
-                    </span>
-                  )}
+              {spinError && <p className="text-sm text-crimson-500">{spinError}</p>}
+              {pick && (
+                <div className="flex flex-col gap-4 rounded-lg border border-neon-400/40 bg-ink-950/50 p-4 sm:flex-row">
+                  <div className="mx-auto w-32 shrink-0 sm:mx-0">
+                    <Poster mediaId={pick.id} title={pick.title} className="rounded-lg" />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <p className="marquee-title text-xl">{pick.title}</p>
+                    <MediaFacts item={pick} />
+                  </div>
                 </div>
-                <p className="mt-1 truncate text-xs text-stone-300">
-                  {m.title} {m.year ? `(${m.year})` : ''}
-                </p>
+              )}
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6">
+                {detail.items.map((m) => (
+                  <div key={m.id} className={m.watchedByMe ? 'opacity-45' : ''} title={m.watchedByMe ? 'Watched' : 'Not watched yet'}>
+                    <div className="relative">
+                      <Poster mediaId={m.id} title={m.title} className="rounded-lg" />
+                      {m.watchedByMe && (
+                        <span className="absolute top-1.5 right-1.5 rounded-full bg-ink-950/85 px-1.5 py-0.5 text-xs text-neon-300">
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 truncate text-xs text-stone-300">
+                      {m.title} {m.year ? `(${m.year})` : ''}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+              <button className="btn btn-ghost w-full" onClick={() => setSelectedId(null)}>
+                Close
+              </button>
+            </div>
+          ) : (
+            <p className="text-stone-400">Loading…</p>
+          )}
+        </Modal>
       )}
 
       <Franchises />

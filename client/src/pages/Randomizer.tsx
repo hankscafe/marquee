@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ListSummary, MediaFilters, MediaItem, RandomFilters, ScheduledPickInfo } from '@marquee/shared';
 import { api, ApiError } from '../api';
 import { MediaFacts } from '../components/MediaDetails';
+import { Modal } from '../components/Modal';
 import { Poster } from '../components/Poster';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -259,16 +260,31 @@ export function Randomizer() {
       </div>
 
       {pick && !spinning && (
-        <div className="card overflow-hidden">
-          <div className="mx-auto max-w-60 p-4">
+        <Modal onClose={() => setPick(null)}>
+          <div className="mx-auto max-w-60">
             <Poster mediaId={pick.id} title={pick.title} className="rounded-lg" />
           </div>
-          <div className="space-y-3 px-6 pb-6">
+          <div className="mt-4 space-y-3">
             <p className="marquee-title text-2xl">{pick.title}</p>
             <MediaFacts item={pick} />
             {pick.librarySection && <p className="text-left text-xs text-stone-500">From {pick.librarySection}</p>}
           </div>
-        </div>
+          <div className="mt-5 flex gap-2">
+            <button
+              className="btn btn-neon flex-1"
+              disabled={spin.isPending}
+              onClick={() => {
+                setError(null);
+                spin.mutate();
+              }}
+            >
+              Spin again
+            </button>
+            <button className="btn btn-ghost flex-1" onClick={() => setPick(null)}>
+              Close
+            </button>
+          </div>
+        </Modal>
       )}
 
       <div className="card space-y-4 p-5 text-left">

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { MediaItem } from '@marquee/shared';
 import { api } from '../api';
+import { Modal } from './Modal';
 import { Poster } from './Poster';
 
 export function MediaFacts({ item }: { item: MediaItem }) {
@@ -58,28 +59,23 @@ export function MediaDetailsModal({ mediaId, onClose }: { mediaId: number | null
 
   if (mediaId === null) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onClick={onClose}>
-      <div
-        className="card max-h-[85vh] w-full max-w-md overflow-y-auto p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {item ? (
-          <div className="space-y-4">
-            <div className="flex gap-4">
-              <div className="w-28 shrink-0">
-                <Poster mediaId={item.id} title={item.title} className="rounded-lg" />
-              </div>
-              <h2 className="font-display text-xl text-neon-300">{item.title}</h2>
+    <Modal onClose={onClose}>
+      {item ? (
+        <div className="space-y-4">
+          <div className="flex gap-4">
+            <div className="w-28 shrink-0">
+              <Poster mediaId={item.id} title={item.title} className="rounded-lg" />
             </div>
-            <MediaFacts item={item} />
+            <h2 className="font-display text-xl text-neon-300">{item.title}</h2>
           </div>
-        ) : (
-          <p className="text-stone-400">Loading…</p>
-        )}
-        <button className="btn btn-ghost mt-5 w-full" onClick={onClose}>
-          Close
-        </button>
-      </div>
-    </div>
+          <MediaFacts item={item} />
+        </div>
+      ) : (
+        <p className="text-stone-400">Loading…</p>
+      )}
+      <button className="btn btn-ghost mt-5 w-full" onClick={onClose}>
+        Close
+      </button>
+    </Modal>
   );
 }

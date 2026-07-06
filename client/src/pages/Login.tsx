@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { startAuthentication } from '@simplewebauthn/browser';
 import { api, ApiError } from '../api';
 import { useAuth } from '../auth';
+import { MarqueeLogo } from '../components/MarqueeLogo';
 
 type Mode = 'login' | 'register' | 'setup';
 
@@ -169,7 +170,9 @@ export function Login() {
       </div>
       <div className="relative w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="marquee-title text-3xl sm:text-4xl">★ MARQUEE ★</div>
+          <div className="text-2xl sm:text-3xl">
+            <MarqueeLogo />
+          </div>
           <div className="mt-2 text-sm tracking-widest text-stone-500 uppercase">Movie night, decided together</div>
         </div>
         <form onSubmit={onSubmit} className="card space-y-4 bg-ink-800/95 p-6 backdrop-blur">

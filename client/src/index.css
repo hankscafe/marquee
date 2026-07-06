@@ -26,6 +26,12 @@
   }
 }
 
+@keyframes bulb-chase {
+  to {
+    background-position: 0.55em 50%;
+  }
+}
+
 body {
   @apply bg-ink-900 text-stone-200 antialiased;
   background-image:
@@ -65,5 +71,54 @@ body {
     text-shadow:
       0 0 16px rgba(62, 203, 255, 0.45),
       0 0 40px rgba(139, 92, 246, 0.3);
+  }
+  /* Wordmark logo: a theater marquee sign. All dimensions in em so the
+     parent's font-size controls the overall scale. */
+  .marquee-sign {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.26em;
+    padding: 0.32em 0.7em 0.36em;
+    border: 1px solid rgba(62, 203, 255, 0.35);
+    border-radius: 0.45em;
+    background: linear-gradient(180deg, rgba(23, 34, 60, 0.85), rgba(4, 7, 15, 0.92));
+    box-shadow:
+      0 0 20px rgba(62, 203, 255, 0.15),
+      inset 0 0 16px rgba(62, 203, 255, 0.07);
+  }
+  .marquee-sign-text {
+    @apply text-neon-300;
+    line-height: 1;
+    font-weight: 600;
+    /* Negative margin rebalances the trailing letter-spacing gap. */
+    letter-spacing: 0.32em;
+    margin-right: -0.32em;
+    text-align: center;
+    text-shadow:
+      0 0 14px rgba(62, 203, 255, 0.55),
+      0 0 36px rgba(139, 92, 246, 0.35);
+  }
+  .marquee-bulbs {
+    height: 0.2em;
+    background-image: radial-gradient(
+      0.09em 0.09em at center,
+      rgba(139, 233, 255, 0.95) 40%,
+      rgba(62, 203, 255, 0.35) 70%,
+      transparent 100%
+    );
+    background-size: 0.55em 0.2em;
+    background-repeat: repeat-x;
+    background-position: 0 50%;
+    animation: bulb-chase 1.4s linear infinite;
+  }
+  .marquee-bulbs-reverse {
+    animation-direction: reverse;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-bulbs {
+    animation: none;
   }
 }

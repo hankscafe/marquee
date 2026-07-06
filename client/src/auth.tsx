@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AuthStatus } from '@marquee/shared';
 import { api } from './api';
+import { MarqueeLogo } from './components/MarqueeLogo';
 
 export function useAuth() {
   return useQuery({
@@ -26,7 +27,9 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <span className="marquee-title text-2xl">MARQUEE</span>
+        <span className="text-xl">
+          <MarqueeLogo />
+        </span>
       </div>
     );
   }

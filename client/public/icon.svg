@@ -1,9 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="24" fill="#070b16"/>
-  <rect x="10" y="10" width="108" height="108" rx="18" fill="none" stroke="#3ecbff" stroke-width="4"/>
-  <circle cx="28" cy="24" r="4" fill="#3ecbff"/>
-  <circle cx="52" cy="24" r="4" fill="#a78bfa"/>
-  <circle cx="76" cy="24" r="4" fill="#3ecbff"/>
-  <circle cx="100" cy="24" r="4" fill="#a78bfa"/>
-  <text x="64" y="88" font-family="Georgia, serif" font-size="56" font-weight="bold" fill="#3ecbff" text-anchor="middle">M</text>
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#17223c"/>
+      <stop offset="1" stop-color="#060a14"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#04070f"/>
+  <rect x="12" y="12" width="104" height="104" rx="16" fill="url(#panel)" stroke="#3ecbff" stroke-opacity="0.55" stroke-width="3"/>
+  <g fill="#8be9ff" filter="url(#glow)">
+    <circle cx="32" cy="27" r="3.2"/>
+    <circle cx="48" cy="27" r="3.2"/>
+    <circle cx="64" cy="27" r="3.2"/>
+    <circle cx="80" cy="27" r="3.2"/>
+    <circle cx="96" cy="27" r="3.2"/>
+    <circle cx="32" cy="101" r="3.2"/>
+    <circle cx="48" cy="101" r="3.2"/>
+    <circle cx="64" cy="101" r="3.2"/>
+    <circle cx="80" cy="101" r="3.2"/>
+    <circle cx="96" cy="101" r="3.2"/>
+  </g>
+  <path d="M40 87 V45 L64 71 L88 45 V87" fill="none" stroke="#8be9ff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
 </svg>
