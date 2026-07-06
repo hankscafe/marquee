@@ -23,6 +23,7 @@ import { passkeyRoutes } from './routes/passkeys.js';
 import { pollRoutes } from './routes/polls.js';
 import { scheduleRoutes } from './routes/schedules.js';
 import { traktRoutes } from './routes/trakt.js';
+import { versionRoutes } from './routes/version.js';
 import { watchWithRoutes } from './routes/watchwith.js';
 
 export async function buildApp() {
@@ -54,6 +55,7 @@ export async function buildApp() {
   await app.register(issueRoutes);
   await app.register(adminRoutes);
   await app.register(adminUserRoutes);
+  await app.register(versionRoutes);
 
   app.get('/api/health', async () => ({ ok: true, version: config.version }));
 

@@ -21,6 +21,16 @@ export interface AuthStatus {
   };
 }
 
+export interface VersionInfo {
+  current: string;
+  repoUrl: string;
+  // Update fields are only populated for admins; everyone else always gets
+  // updateAvailable: false so no banner shows.
+  updateAvailable: boolean;
+  latest: string | null;
+  releaseUrl: string | null;
+}
+
 export type MediaType = 'movie' | 'show';
 
 export type SourceKind = 'plex' | 'jellyfin' | 'emby';

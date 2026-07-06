@@ -1,6 +1,43 @@
+import { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import type { VersionInfo } from '@marquee/shared';
+import { api } from '../api';
 import { useAuth } from '../auth';
 import { MarqueeLogo } from './MarqueeLogo';
+
+const DISMISSED_UPDATE_KEY = 'marquee-dismissed-update';
+
+// Shown to admins when the server found a newer GitHub release.
+function UpdateBanner({ version }: { version: VersionInfo }) {
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISSED_UPDATE_KEY) === version.latest);
+  if (!version.updateAvailable || !version.latest || dismissed) return null;
+
+  return (
+    <div className="border-b border-neon-500/20 bg-neon-500/10">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
+        <span className="text-neon-300">
+          ✦ Marquee v{version.latest} is available — you're running v{version.current}
+        </span>
+        {version.releaseUrl && (
+          <a href={version.releaseUrl} target="_blank" rel="noreferrer" className="text-neon-300 underline hover:text-neon-400">
+            Release notes
+          </a>
+        )}
+        <button
+          className="ml-auto text-stone-400 hover:text-stone-200"
+          onClick={() => {
+            // Remember per-version, so the banner returns for the next release.
+            localStorage.setItem(DISMISSED_UPDATE_KEY, version.latest!);
+            setDismissed(true);
+          }}
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-lg px-3 py-2 text-sm transition-colors ${
@@ -9,6 +46,12 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 export function Layout() {
   const { data } = useAuth();
+  const { data: version } = useQuery({
+    queryKey: ['version'],
+    queryFn: () => api<VersionInfo>('/api/version'),
+    staleTime: 15 * 60 * 1000,
+    refetchInterval: 60 * 60 * 1000, // long-lived tabs still learn about new releases
+  });
 
   return (
     <div className="min-h-screen">
@@ -50,9 +93,20 @@ export function Layout() {
           </nav>
         </div>
       </header>
+      {version && <UpdateBanner key={version.latest ?? 'none'} version={version} />}
       <main className="mx-auto max-w-5xl px-4 py-6 pb-16">
         <Outlet />
       </main>
+      <footer className="mx-auto max-w-5xl px-4 pb-6 text-center text-xs text-stone-600">
+        {version && (
+          <p>
+            Marquee v{version.current} ·{' '}
+            <a href={version.repoUrl} target="_blank" rel="noreferrer" className="hover:text-neon-300">
+              GitHub
+            </a>
+          </p>
+        )}
+      </footer>
     </div>
   );
 }

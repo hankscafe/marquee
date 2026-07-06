@@ -4,12 +4,14 @@ import { buildApp } from './app.js';
 import { startDiscordBot } from './discord/bot.js';
 import { startScheduler } from './scheduler.js';
 import { migrateSecretsAtRest } from './settings.js';
+import { startUpdateChecker } from './updates.js';
 
 runMigrations();
 migrateSecretsAtRest();
 
 const app = await buildApp();
 startScheduler();
+startUpdateChecker();
 void startDiscordBot(); // no-op until a bot token is configured
 
 try {
