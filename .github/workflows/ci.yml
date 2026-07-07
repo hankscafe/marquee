@@ -65,8 +65,22 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full history + tags to build the changelog
+      # This repo pushes straight to main (no PRs), so GitHub's auto-generated
+      # notes come up empty. Build the changelog from the commit log instead.
+      - name: Build release notes from the commit log
+        id: notes
+        run: |
+          prev=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          range="${prev:+$prev..}${GITHUB_REF_NAME}"
+          {
+            echo "body<<NOTES_EOF"
+            git log --no-merges --pretty='* %s' "$range" | grep -v '^\* Release v' || true
+            echo ""
+            echo "Container image: \`ghcr.io/${{ github.repository }}:${GITHUB_REF_NAME}\`"
+            echo "NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
       - uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
-          body: |
-            Container image: `ghcr.io/${{ github.repository }}:${{ github.ref_name }}`
+          body: ${{ steps.notes.outputs.body }}
