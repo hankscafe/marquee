@@ -1,6 +1,6 @@
 {
   "name": "marquee",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "description": "Self-hosted movie night polls and randomizer for your Plex server",
   "workspaces": [
