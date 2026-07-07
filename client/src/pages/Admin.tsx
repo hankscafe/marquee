@@ -289,6 +289,71 @@ function JfServerCard({
   );
 }
 
+// Read-only widget API: generate/rotate/revoke the key and show usage.
+function WidgetApiCard({ keySet, appUrl }: { keySet: boolean | undefined; appUrl: string | null | undefined }) {
+  const queryClient = useQueryClient();
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const base = appUrl?.replace(/\/+$/, '') || 'https://your-marquee-url';
+  const endpoint = `${base}/api/widget/polls`;
+
+  const generate = useMutation({
+    mutationFn: () => api<{ apiKey: string }>('/api/admin/widget-key', { method: 'POST', body: {} }),
+    onSuccess: (r) => {
+      setGeneratedKey(r.apiKey);
+      setMsg(null);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'settings'] });
+    },
+    onError: (err) => setMsg(err instanceof ApiError ? `✗ ${err.message}` : '✗ Could not generate key'),
+  });
+  const revoke = useMutation({
+    mutationFn: () => api('/api/admin/widget-key', { method: 'DELETE' }),
+    onSuccess: () => {
+      setGeneratedKey(null);
+      setMsg('Key revoked — the widget API is disabled.');
+      queryClient.invalidateQueries({ queryKey: ['admin', 'settings'] });
+    },
+    onError: (err) => setMsg(err instanceof ApiError ? `✗ ${err.message}` : '✗ Could not revoke key'),
+  });
+
+  return (
+    <section className="card space-y-4 p-5">
+      <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Homepage widget API</h2>
+      <p className="text-sm text-stone-400">
+        A read-only JSON endpoint for a dashboard widget (e.g.{' '}
+        <a href="https://gethomepage.dev" target="_blank" rel="noreferrer" className="text-neon-300 underline">
+          gethomepage.dev
+        </a>
+        ). Send the key as a header — <code className="text-stone-300">Authorization: Bearer &lt;key&gt;</code> or{' '}
+        <code className="text-stone-300">X-API-Key: &lt;key&gt;</code>. Add{' '}
+        <code className="text-stone-300">?spotlight=1</code> to return only the spotlight poll (and its winner once closed).
+      </p>
+      <p className="text-sm text-stone-400">
+        Endpoint: <code className="break-all text-stone-300">{endpoint}</code>
+        {!appUrl && <span className="text-stone-500"> — set the public app URL (Discord card) so links resolve.</span>}
+      </p>
+      {generatedKey && (
+        <div className="rounded-lg border border-neon-500/25 bg-ink-950/60 p-3">
+          <p className="text-xs text-stone-400">Copy this key now — it won’t be shown again:</p>
+          <code className="mt-1 block break-all text-neon-300">{generatedKey}</code>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button className="btn btn-neon" disabled={generate.isPending} onClick={() => generate.mutate()}>
+          {keySet ? 'Regenerate key' : 'Generate key'}
+        </button>
+        {keySet && (
+          <button className="btn btn-ghost" disabled={revoke.isPending} onClick={() => revoke.mutate()}>
+            Revoke
+          </button>
+        )}
+        <span className="text-sm text-stone-500">{keySet ? 'A key is active.' : 'No key yet — the API is disabled.'}</span>
+      </div>
+      {msg && <p className="text-sm text-stone-300">{msg}</p>}
+    </section>
+  );
+}
+
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="card p-4 text-center">
@@ -740,6 +805,8 @@ export function Admin() {
         </div>
         {seerrMessage && <p className="text-sm text-stone-300">{seerrMessage}</p>}
       </section>
+
+      <WidgetApiCard keySet={settings?.widgetKeySet} appUrl={settings?.appUrl} />
         </>
       )}
 

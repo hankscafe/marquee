@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { desc, eq, sql, type SQL } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
@@ -78,9 +79,23 @@ export async function adminRoutes(app: FastifyInstance) {
     seerrKind: getSetting('seerr.kind') === 'ombi' ? ('ombi' as const) : ('overseerr' as const),
     seerrKeySet: !!getSetting('seerr.apiKey'),
     allowRegistration: getSetting('auth.allowRegistration') !== 'false',
+    widgetKeySet: !!getSetting('widget.apiKey'),
   });
 
   app.get('/api/admin/settings', { preHandler: requireAdmin }, async () => settingsPayload());
+
+  // Generate (or rotate) the key for the read-only widget API. Returned once in
+  // plaintext here — it's encrypted at rest and never echoed by the settings GET.
+  app.post('/api/admin/widget-key', { preHandler: requireAdmin }, async () => {
+    const apiKey = crypto.randomBytes(24).toString('base64url');
+    setSetting('widget.apiKey', apiKey);
+    return { apiKey };
+  });
+
+  app.delete('/api/admin/widget-key', { preHandler: requireAdmin }, async (_request, reply) => {
+    setSetting('widget.apiKey', '');
+    return reply.code(204).send();
+  });
 
   app.put('/api/admin/settings', { preHandler: requireAdmin }, async (request, reply) => {
     const parsed = z

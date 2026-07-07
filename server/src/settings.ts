@@ -14,6 +14,7 @@ const SECRET_KEYS = new Set([
   'seerr.apiKey',
   'discord.botToken',
   'oidc.clientSecret',
+  'widget.apiKey',
 ]);
 
 export function getSetting(key: string): string | null {

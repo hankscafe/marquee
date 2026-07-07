@@ -25,6 +25,7 @@ import { scheduleRoutes } from './routes/schedules.js';
 import { traktRoutes } from './routes/trakt.js';
 import { versionRoutes } from './routes/version.js';
 import { watchWithRoutes } from './routes/watchwith.js';
+import { widgetRoutes } from './routes/widget.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -58,6 +59,7 @@ export async function buildApp() {
   await app.register(adminRoutes);
   await app.register(adminUserRoutes);
   await app.register(versionRoutes);
+  await app.register(widgetRoutes);
 
   app.get('/api/health', async () => ({ ok: true, version: config.version }));
 
