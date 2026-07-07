@@ -112,9 +112,78 @@ Everything else — media servers, Trakt, TMDb, Discord, request services, OIDC,
 | **Overseerr / Jellyseerr / Ombi** | Service URL + API key | One-click requests for missing titles |
 | **OIDC** | Issuer URL + client ID/secret | Single sign-on |
 
+## Widget API
+
+A read-only JSON endpoint for external dashboards (e.g. [gethomepage.dev](https://gethomepage.dev)) — show the current poll's standings, or the spotlight poll and its winner, on a wall display.
+
+**Enable it:** Admin → Integrations → **Homepage widget API** → *Generate key*. The key is shown once — copy it. You can rotate or revoke it any time; the endpoint stays disabled (`404`) until a key exists.
+
+**Auth:** send the key as a header (either form works, matching Homepage's custom-header support):
+
+```
+Authorization: Bearer <key>
+```
+```
+X-API-Key: <key>
+```
+
+Requests without a valid key get `401`. The endpoint is rate-limited and never exposes draft polls.
+
+**Endpoints**
+
+| Request | Returns |
+| --- | --- |
+| `GET /api/widget/polls` | The spotlight poll plus all open/closed polls |
+| `GET /api/widget/polls?spotlight=1` | Only the spotlight poll (and its winner once closed) |
+
+```bash
+curl -H "Authorization: Bearer $KEY" "https://marquee.example.com/api/widget/polls?spotlight=1"
+```
+
+```json
+{
+  "generatedAt": "2026-07-07T18:00:00.000Z",
+  "spotlight": {
+    "title": "Friday Movie Night",
+    "status": "closed",
+    "url": "https://marquee.example.com/p/xmSS0yKpLi63",
+    "totalVotes": 5,
+    "optionCount": 5,
+    "closesAt": null,
+    "leader": null,
+    "winner": { "title": "The Big Year (2000)", "votes": 3, "percent": 60 },
+    "options": [
+      { "title": "The Big Year (2000)", "votes": 3, "percent": 60 },
+      { "title": "Longlegs (2001)", "votes": 1, "percent": 20 }
+    ]
+  }
+}
+```
+
+`leader` is the front-runner while a poll is open (`null` once closed or with no votes); `winner` is set once it closes; `url` needs the public app URL (Admin → Discord card). The default mode adds a `polls` array of the same shape.
+
+**Homepage (gethomepage.dev) example**
+
+```yaml
+- Movie night:
+    widget:
+      type: customapi
+      url: https://marquee.example.com/api/widget/polls?spotlight=1
+      headers:
+        X-API-Key: your-key-here
+      mappings:
+        - field: spotlight.title
+          label: Now voting
+        - field: spotlight.leader.title
+          label: Leading
+        - field: spotlight.totalVotes
+          label: Votes
+```
+
 ## Security
 
 - Integration secrets and user OAuth tokens are **encrypted at rest** (AES-256-GCM) with a key derived from the instance secret — a copy of the database alone exposes nothing
+- The widget API key is encrypted at rest too, sent only as a header, and compared in constant time
 - Passwords hashed with scrypt; sessions in signed, HTTP-only, SameSite cookies (Secure over TLS)
 - Rate limiting on all credential endpoints; security headers via Helmet
 - Media-server tokens/keys never reach the browser — posters proxy through the server
