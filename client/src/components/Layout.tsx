@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { VersionInfo } from '@marquee/shared';
 import { api } from '../api';
@@ -45,8 +45,44 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? 'bg-neon-500/15 text-neon-300' : 'text-stone-400 hover:text-neon-300'
   }`;
 
+// Full-width rows with bigger touch targets for the mobile dropdown.
+const mobileNavLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `rounded-lg px-3 py-2.5 text-sm transition-colors ${
+    isActive ? 'bg-neon-500/15 text-neon-300' : 'text-stone-300 hover:bg-neon-500/10 hover:text-neon-300'
+  }`;
+
+const NAV_LINKS: { to: string; label: string; end?: boolean; title?: string }[] = [
+  { to: '/', label: 'Polls', end: true },
+  { to: '/randomizer', label: 'Randomizer' },
+  { to: '/watch-with', label: 'Watch With' },
+  { to: '/collections', label: 'Collections' },
+  { to: '/lists', label: 'Lists' },
+  { to: '/poster', label: 'Poster', title: 'Cinema poster display' },
+  { to: '/report', label: 'Report' },
+];
+
+function MenuIcon({ open }: { open: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-6 w-6" aria-hidden="true">
+      {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 6h16M4 12h16M4 18h16" />}
+    </svg>
+  );
+}
+
 export function Layout() {
   const { data } = useAuth();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Close the mobile menu whenever the route changes.
+  useEffect(() => setMenuOpen(false), [location.pathname]);
+
+  // One source of truth for both the desktop bar and the mobile dropdown.
+  const links = [
+    ...NAV_LINKS,
+    ...(data?.user?.isAdmin ? [{ to: '/admin', label: 'Admin' }] : []),
+    { to: '/account', label: data?.user?.username ?? 'Account', title: 'Account & sign out' },
+  ];
   const { data: version } = useQuery({
     queryKey: ['version'],
     queryFn: () => api<VersionInfo>('/api/version'),
@@ -57,43 +93,41 @@ export function Layout() {
   return (
     <div className="min-h-screen">
       {data?.idleTimeoutMinutes != null && <IdleLogout timeoutMinutes={data.idleTimeoutMinutes} />}
-      <header className="sticky top-0 z-10 border-b border-neon-500/15 bg-ink-950/85 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
+      <header className="sticky top-0 z-20 border-b border-neon-500/15 bg-ink-950/85 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center gap-x-4 px-4 py-3">
           <Link to="/" className="text-sm sm:text-base">
             <MarqueeLogo />
           </Link>
-          <nav className="ml-auto flex flex-wrap items-center gap-1">
-            <NavLink to="/" end className={navLinkClass}>
-              Polls
-            </NavLink>
-            <NavLink to="/randomizer" className={navLinkClass}>
-              Randomizer
-            </NavLink>
-            <NavLink to="/watch-with" className={navLinkClass}>
-              Watch With
-            </NavLink>
-            <NavLink to="/collections" className={navLinkClass}>
-              Collections
-            </NavLink>
-            <NavLink to="/lists" className={navLinkClass}>
-              Lists
-            </NavLink>
-            <NavLink to="/poster" className={navLinkClass} title="Cinema poster display">
-              Poster
-            </NavLink>
-            <NavLink to="/report" className={navLinkClass}>
-              Report
-            </NavLink>
-            {data?.user?.isAdmin && (
-              <NavLink to="/admin" className={navLinkClass}>
-                Admin
+          {/* Desktop: full nav bar */}
+          <nav className="ml-auto hidden flex-wrap items-center gap-1 md:flex">
+            {links.map((l) => (
+              <NavLink key={l.to} to={l.to} end={l.end} title={l.title} className={navLinkClass}>
+                {l.label}
               </NavLink>
-            )}
-            <NavLink to="/account" className={navLinkClass} title="Account & sign out">
-              {data?.user?.username ?? 'Account'}
-            </NavLink>
+            ))}
           </nav>
+          {/* Mobile: hamburger toggle */}
+          <button
+            className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-stone-300 hover:bg-neon-500/10 hover:text-neon-300 md:hidden"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+          >
+            <MenuIcon open={menuOpen} />
+          </button>
         </div>
+        {/* Mobile: dropdown menu */}
+        {menuOpen && (
+          <nav className="border-t border-neon-500/15 md:hidden">
+            <div className="mx-auto flex max-w-5xl flex-col gap-1 px-4 py-2">
+              {links.map((l) => (
+                <NavLink key={l.to} to={l.to} end={l.end} title={l.title} className={mobileNavLinkClass}>
+                  {l.label}
+                </NavLink>
+              ))}
+            </div>
+          </nav>
+        )}
       </header>
       {version && <UpdateBanner key={version.latest ?? 'none'} version={version} />}
       <main className="mx-auto max-w-5xl px-4 py-6 pb-16">
