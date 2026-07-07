@@ -89,6 +89,7 @@ export interface PollSummary {
   shareToken: string;
   isOwner: boolean;
   pinned: boolean;
+  spotlight: boolean;
   winnerOptionId: number | null;
   options: PollOptionResult[];
   optionCount: number;
@@ -121,6 +122,7 @@ export interface PollDetail {
   winnerOptionId: number | null;
   discordPosted: boolean;
   pinned: boolean;
+  spotlight: boolean;
   isOwner: boolean;
   myVoteOptionId: number | null;
   totalVotes: number;
@@ -184,6 +186,35 @@ export interface AdminSettings {
   seerrKind: 'overseerr' | 'ombi';
   seerrKeySet: boolean;
   allowRegistration: boolean;
+  widgetKeySet: boolean;
+}
+
+// Read-only shapes returned by the external widget API (GET /api/widget/polls).
+export interface WidgetPollOption {
+  title: string;
+  votes: number;
+  percent: number;
+}
+
+export interface WidgetPoll {
+  title: string;
+  status: PollStatus;
+  url: string | null;
+  totalVotes: number;
+  optionCount: number;
+  closesAt: string | null;
+  // Front-runner while a poll is open (null with no votes); omitted once closed.
+  leader: WidgetPollOption | null;
+  // Winning option once the poll is closed.
+  winner: WidgetPollOption | null;
+  options: WidgetPollOption[];
+}
+
+export interface WidgetPollsResponse {
+  generatedAt: string;
+  spotlight: WidgetPoll | null;
+  // Present in the default mode; omitted when ?spotlight=1.
+  polls?: WidgetPoll[];
 }
 
 export interface DiscordStatus {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CollectionDetail, CollectionProgress, MediaFilters, MediaItem, PollDetail } from '@marquee/shared';
 import { api, ApiError } from '../api';
+import { MediaDetailsModal } from '../components/MediaDetails';
 import { Poster } from '../components/Poster';
 
 export function NewPoll() {
@@ -13,6 +14,7 @@ export function NewPoll() {
   const [closesAt, setClosesAt] = useState('');
   const [openNow, setOpenNow] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detailsId, setDetailsId] = useState<number | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -130,10 +132,20 @@ export function NewPoll() {
           </h2>
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6">
             {selected.map((m) => (
-              <button key={m.id} onClick={() => toggle(m)} className="group text-left" title="Remove">
-                <Poster mediaId={m.id} title={m.title} className="rounded-lg ring-2 ring-neon-400 group-hover:opacity-60" />
-                <p className="mt-1 truncate text-xs text-stone-300">{m.title}</p>
-              </button>
+              <div key={m.id} className="group relative text-left">
+                <button
+                  className="absolute top-1.5 right-1.5 z-[1] flex h-8 w-8 items-center justify-center rounded-full bg-ink-950/80 text-neon-300 backdrop-blur hover:bg-ink-950"
+                  onClick={() => setDetailsId(m.id)}
+                  title="About this title"
+                  aria-label={`About ${m.title}`}
+                >
+                  ⓘ
+                </button>
+                <button onClick={() => toggle(m)} className="w-full text-left" title="Remove">
+                  <Poster mediaId={m.id} title={m.title} className="rounded-lg ring-2 ring-neon-400 group-hover:opacity-60" />
+                  <p className="mt-1 truncate text-xs text-stone-300">{m.title}</p>
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -198,16 +210,26 @@ export function NewPoll() {
           {results?.map((m) => {
             const isSelected = selected.some((s) => s.id === m.id);
             return (
-              <button key={m.id} onClick={() => toggle(m)} className="text-left">
-                <Poster
-                  mediaId={m.id}
-                  title={m.title}
-                  className={`rounded-lg transition-opacity ${isSelected ? 'ring-2 ring-neon-400' : 'hover:opacity-80'}`}
-                />
-                <p className="mt-1 truncate text-xs text-stone-300">
-                  {m.title} {m.year ? `(${m.year})` : ''}
-                </p>
-              </button>
+              <div key={m.id} className="relative text-left">
+                <button
+                  className="absolute top-1.5 right-1.5 z-[1] flex h-8 w-8 items-center justify-center rounded-full bg-ink-950/80 text-neon-300 backdrop-blur hover:bg-ink-950"
+                  onClick={() => setDetailsId(m.id)}
+                  title="About this title"
+                  aria-label={`About ${m.title}`}
+                >
+                  ⓘ
+                </button>
+                <button onClick={() => toggle(m)} className="w-full text-left">
+                  <Poster
+                    mediaId={m.id}
+                    title={m.title}
+                    className={`rounded-lg transition-opacity ${isSelected ? 'ring-2 ring-neon-400' : 'hover:opacity-80'}`}
+                  />
+                  <p className="mt-1 truncate text-xs text-stone-300">
+                    {m.title} {m.year ? `(${m.year})` : ''}
+                  </p>
+                </button>
+              </div>
             );
           })}
           {results && results.length === 0 && (
@@ -218,6 +240,7 @@ export function NewPoll() {
         </div>
       </div>
 
+      <MediaDetailsModal mediaId={detailsId} onClose={() => setDetailsId(null)} />
     </div>
   );
 }

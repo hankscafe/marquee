@@ -133,6 +133,8 @@ export const polls = sqliteTable('polls', {
   discordChannelId: text('discord_channel_id'),
   // Admin-pinned polls sort first on the home page.
   pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
+  // The single admin-chosen "spotlight" poll featured as a hero on the home page.
+  spotlight: integer('spotlight', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),

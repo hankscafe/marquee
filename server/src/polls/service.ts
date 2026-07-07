@@ -55,6 +55,7 @@ export function serializePollDetail(poll: typeof polls.$inferSelect, userId: num
     winnerOptionId: poll.winnerOptionId,
     discordPosted: !!poll.discordMessageId,
     pinned: poll.pinned,
+    spotlight: poll.spotlight,
     isOwner: poll.createdBy === userId,
     myVoteOptionId: myVote?.optionId ?? null,
     totalVotes: [...counts.values()].reduce((a, b) => a + b, 0),

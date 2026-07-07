@@ -1,0 +1,1 @@
+ALTER TABLE `polls` ADD `spotlight` integer DEFAULT false NOT NULL;

@@ -51,6 +51,15 @@ export function PollPage() {
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not update pin'),
   });
 
+  const toggleSpotlight = useMutation({
+    mutationFn: (spotlight: boolean) => api<PollDetail>(`/api/polls/${token}/spotlight`, { body: { spotlight } }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['poll', token], data);
+      queryClient.invalidateQueries({ queryKey: ['polls'] });
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not update spotlight'),
+  });
+
   const transition = useMutation({
     mutationFn: (action: 'open' | 'close') => api<PollDetail>(`/api/polls/${token}/${action}`, { body: {} }),
     onSuccess: (data) => {
@@ -112,6 +121,16 @@ export function PollPage() {
           {auth?.user?.isAdmin && (
             <button className="btn btn-ghost" disabled={togglePin.isPending} onClick={() => togglePin.mutate(!poll.pinned)}>
               {poll.pinned ? 'Unpin' : 'Pin'}
+            </button>
+          )}
+          {auth?.user?.isAdmin && (
+            <button
+              className="btn btn-ghost"
+              disabled={toggleSpotlight.isPending}
+              onClick={() => toggleSpotlight.mutate(!poll.spotlight)}
+              title="Feature this poll as the home-page spotlight"
+            >
+              {poll.spotlight ? 'Unspotlight' : 'Spotlight'}
             </button>
           )}
           {poll.isOwner && poll.status === 'draft' && (

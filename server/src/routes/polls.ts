@@ -59,6 +59,7 @@ export async function pollRoutes(app: FastifyInstance) {
         shareToken: p.shareToken,
         isOwner: p.createdBy === userId,
         pinned: p.pinned,
+        spotlight: p.spotlight,
         winnerOptionId: p.winnerOptionId,
         options,
         optionCount: options.length,
@@ -170,6 +171,24 @@ export async function pollRoutes(app: FastifyInstance) {
     const parsed = z.object({ pinned: z.boolean() }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
     db.update(polls).set({ pinned: parsed.data.pinned }).where(eq(polls.id, poll.id)).run();
+    return serializePollDetail(pollByToken(token)!, request.user!.id);
+  });
+
+  // Admins can feature one poll as the home-page spotlight. It's singular, so
+  // spotlighting a poll clears the flag from whichever poll held it before.
+  app.post('/api/polls/:token/spotlight', { preHandler: requireUser }, async (request, reply) => {
+    const { token } = request.params as { token: string };
+    if (!request.user!.isAdmin) return reply.code(403).send({ error: 'Only admins can spotlight polls' });
+    const poll = pollByToken(token);
+    if (!poll) return reply.code(404).send({ error: 'Poll not found' });
+    const parsed = z.object({ spotlight: z.boolean() }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
+    if (parsed.data.spotlight) {
+      db.update(polls).set({ spotlight: false }).where(eq(polls.spotlight, true)).run();
+      db.update(polls).set({ spotlight: true }).where(eq(polls.id, poll.id)).run();
+    } else {
+      db.update(polls).set({ spotlight: false }).where(eq(polls.id, poll.id)).run();
+    }
     return serializePollDetail(pollByToken(token)!, request.user!.id);
   });
 
