@@ -25,11 +25,19 @@ Can't decide? Draw a random title from the whole library, a single library, a se
 
 ![Randomizer](docs/screenshots/randomizer.png)
 
+The pick is revealed in a modal — spin again right there until something sticks.
+
+![Randomizer pick](docs/screenshots/randomizer-pick.png)
+
 ### Collections & film series
 
 Browse your server's collections with per-person watched progress, and let the TMDb-powered franchise scan find film series your library has *started* — with one-click requests to Overseerr/Jellyseerr/Ombi for the missing entries.
 
 ![Collections](docs/screenshots/collections.png)
+
+Open any collection to see its titles and who's watched what, or spin an unwatched pick from it.
+
+![Collection detail](docs/screenshots/collections-pick.png)
 
 ### Watch With
 
