@@ -1,4 +1,4 @@
-# 🎬 Marquee
+# Marquee
 
 **Self-hosted movie night, decided together.** Build polls from your Plex, Jellyfin, or Emby library, share a link, let everyone vote once, and let the marquee announce tonight's feature — or spin the randomizer when nobody can decide.
 
