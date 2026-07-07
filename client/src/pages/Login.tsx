@@ -15,6 +15,7 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [plexPinId, setPlexPinId] = useState<number | null>(null);
   const [accountKind, setAccountKind] = useState<'local' | 'jellyfin' | 'emby'>('local');
   const plexPopup = useRef<Window | null>(null);
@@ -29,13 +30,14 @@ export function Login() {
     if (isPlexDone) window.close();
   }, [isPlexDone]);
 
-  // Failed OIDC round-trips land back here with the reason in the query string.
+  // Failed OIDC round-trips land back here with the reason in the query string;
+  // the idle auto-logout redirects here with ?reason=idle.
   useEffect(() => {
     const oidcError = searchParams.get('oidcError');
-    if (oidcError) {
-      setError(oidcError);
-      setSearchParams({}, { replace: true });
-    }
+    const reason = searchParams.get('reason');
+    if (oidcError) setError(oidcError);
+    if (reason === 'idle') setNotice('You were signed out due to inactivity.');
+    if (oidcError || reason) setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
   // Poll the PIN until the user approves it in the Plex tab (5 min timeout).
@@ -180,6 +182,9 @@ export function Login() {
             <h1 className="font-display text-xl text-neon-300">{heading}</h1>
             <p className="mt-1 text-sm text-stone-400">{subheading}</p>
           </div>
+          {notice && (
+            <p className="rounded-md border border-neon-500/20 bg-neon-500/10 px-3 py-2 text-sm text-neon-300">{notice}</p>
+          )}
           {activeMode === 'login' && (data?.authMethods?.jellyfin || data?.authMethods?.emby) && (
             <div className="flex gap-1 rounded-lg bg-ink-950/60 p-1">
               {(

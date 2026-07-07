@@ -4,6 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
 import { getOidcConfiguration, getOidcSettings, oidcRedirectUri } from './oidc.js';
+import { config } from '../config.js';
 import { encryptSecret } from '../crypto.js';
 import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
@@ -40,6 +41,11 @@ export async function authRoutes(app: FastifyInstance) {
     return {
       needsSetup: userCount() === 0,
       user: request.user,
+      idleTimeoutMinutes: request.user
+        ? request.user.isAdmin
+          ? config.adminIdleMinutes
+          : config.userIdleMinutes
+        : null,
       authMethods: {
         plex: !!getPlexConfig(),
         jellyfin: !!getJfConfig('jellyfin'),

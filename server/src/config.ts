@@ -33,6 +33,13 @@ function parseTrustProxy(v: string | undefined): boolean | number | string {
   return Number.isInteger(n) ? n : v;
 }
 
+// Idle auto-logout windows, in minutes. Admins get a shorter window than
+// regular users. Overridable via env for stricter or looser deployments.
+function idleMinutes(envVar: string, fallback: number): number {
+  const n = Number(process.env[envVar]);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
 function readVersion(): string {
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../package.json'), 'utf8')) as {
@@ -49,6 +56,8 @@ export const config = {
   port: Number(process.env.PORT ?? 3000),
   host: process.env.HOST ?? '0.0.0.0',
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
+  adminIdleMinutes: idleMinutes('ADMIN_IDLE_MINUTES', 120), // 2 hours
+  userIdleMinutes: idleMinutes('USER_IDLE_MINUTES', 360), // 6 hours
   dataDir,
   databasePath: process.env.DATABASE_PATH ?? path.join(dataDir, 'marquee.db'),
   sessionSecret: loadSessionSecret(),

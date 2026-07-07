@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { VersionInfo } from '@marquee/shared';
 import { api } from '../api';
 import { useAuth } from '../auth';
+import { IdleLogout } from './IdleLogout';
 import { MarqueeLogo } from './MarqueeLogo';
 
 const DISMISSED_UPDATE_KEY = 'marquee-dismissed-update';
@@ -55,6 +56,7 @@ export function Layout() {
 
   return (
     <div className="min-h-screen">
+      {data?.idleTimeoutMinutes != null && <IdleLogout timeoutMinutes={data.idleTimeoutMinutes} />}
       <header className="sticky top-0 z-10 border-b border-neon-500/15 bg-ink-950/85 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
           <Link to="/" className="text-sm sm:text-base">

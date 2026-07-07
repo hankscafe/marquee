@@ -11,6 +11,9 @@ export interface UserInfo {
 export interface AuthStatus {
   needsSetup: boolean;
   user: UserInfo | null;
+  // Minutes of inactivity before this session is auto-logged-out; null when
+  // signed out. Shorter for admins than regular users.
+  idleTimeoutMinutes: number | null;
   authMethods: {
     plex: boolean;
     jellyfin: boolean;

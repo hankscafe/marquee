@@ -42,6 +42,9 @@ export const sessions = sqliteTable('sessions', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  // Last request seen on this session, for idle auto-logout. Nullable so the
+  // migration is a plain ADD COLUMN; the auth hook initializes it on first use.
+  lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }),
 });
 
 // Instance settings managed from the admin UI (Plex URL/token, future OIDC config).
