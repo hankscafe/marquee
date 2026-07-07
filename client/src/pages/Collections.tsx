@@ -87,7 +87,12 @@ function Franchises() {
         <Modal wide onClose={() => setSelectedId(null)}>
           {detail ? (
             <div className="space-y-4">
-              <h3 className="font-display text-xl text-stone-100">{detail.name}</h3>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="font-display text-xl text-stone-100">{detail.name}</h3>
+                <button className="btn btn-ghost" onClick={() => setSelectedId(null)}>
+                  Close
+                </button>
+              </div>
               {message && <p className="text-sm text-stone-300">{message}</p>}
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6">
                 {detail.parts.map((p) => (
@@ -127,9 +132,6 @@ function Franchises() {
               </div>
                 ))}
               </div>
-              <button className="btn btn-ghost w-full" onClick={() => setSelectedId(null)}>
-                Close
-              </button>
             </div>
           ) : (
             <p className="text-stone-400">Loading…</p>
@@ -275,6 +277,7 @@ export function Collections() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [pick, setPick] = useState<MediaItem | null>(null);
   const [spinError, setSpinError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   const { data: collections, isLoading } = useQuery({
     queryKey: ['collections'],
@@ -299,6 +302,8 @@ export function Collections() {
     },
   });
 
+  const filtered = (collections ?? []).filter((c) => c.title.toLowerCase().includes(query.trim().toLowerCase()));
+
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl text-neon-300">Collections</h1>
@@ -314,8 +319,17 @@ export function Collections() {
         </div>
       )}
 
+      {collections && collections.length > 0 && (
+        <input
+          className="input"
+          placeholder={`Search ${collections.length} collections…`}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-        {collections?.map((c) => {
+        {filtered.map((c) => {
           const pct = c.itemCount > 0 ? Math.round((c.watchedCount / c.itemCount) * 100) : 0;
           return (
             <button
@@ -339,6 +353,9 @@ export function Collections() {
           );
         })}
       </div>
+      {collections && collections.length > 0 && filtered.length === 0 && (
+        <p className="text-sm text-stone-400">No collections match “{query}”.</p>
+      )}
 
       {selectedId !== null && (
         <Modal wide onClose={() => setSelectedId(null)}>
@@ -346,13 +363,18 @@ export function Collections() {
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="font-display text-xl text-stone-100">{detail.title}</h2>
-                <button
-                  className="btn btn-neon"
-                  disabled={spinUnwatched.isPending}
-                  onClick={() => spinUnwatched.mutate(detail.id)}
-                >
-                  Spin an unwatched one
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    className="btn btn-neon"
+                    disabled={spinUnwatched.isPending}
+                    onClick={() => spinUnwatched.mutate(detail.id)}
+                  >
+                    Spin an unwatched one
+                  </button>
+                  <button className="btn btn-ghost" onClick={() => setSelectedId(null)}>
+                    Close
+                  </button>
+                </div>
               </div>
               {spinError && <p className="text-sm text-crimson-500">{spinError}</p>}
               {pick && (
@@ -383,9 +405,6 @@ export function Collections() {
                   </div>
                 ))}
               </div>
-              <button className="btn btn-ghost w-full" onClick={() => setSelectedId(null)}>
-                Close
-              </button>
             </div>
           ) : (
             <p className="text-stone-400">Loading…</p>
