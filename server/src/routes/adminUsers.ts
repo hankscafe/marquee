@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { asc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { polls, users } from '../db/schema.js';
+import { polls, sessions, users } from '../db/schema.js';
 import { requireAdmin } from '../auth/plugin.js';
 import { hashPassword } from '../auth/passwords.js';
 import { getFriends, getHomeUsers } from '../plex/plextv.js';
@@ -87,6 +87,9 @@ export async function adminUserRoutes(app: FastifyInstance) {
       })
       .where(eq(users.id, id))
       .run();
+    // A password reset must lock out anyone holding a stolen session for this
+    // account, so revoke all of the user's existing sessions.
+    if (parsed.data.password) db.delete(sessions).where(eq(sessions.userId, id)).run();
     return serializeUser(db.select().from(users).where(eq(users.id, id)).get()!);
   });
 

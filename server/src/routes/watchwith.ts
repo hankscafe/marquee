@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { eq, ne } from 'drizzle-orm';
+import { eq, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { media, users } from '../db/schema.js';
@@ -14,12 +14,19 @@ import { serializeMedia } from './media.js';
 export async function watchWithRoutes(app: FastifyInstance) {
   // Everyone else on the instance, with what history sources they bring.
   app.get('/api/watchwith/partners', { preHandler: requireUser }, async (request) => {
+    // Reduce token presence to booleans in SQL so other users' encrypted
+    // tokens never enter application memory here.
     return db
-      .select({ id: users.id, username: users.username, plexToken: users.plexToken, traktToken: users.traktToken })
+      .select({
+        id: users.id,
+        username: users.username,
+        hasPlex: sql<number>`(${users.plexToken} is not null)`,
+        hasTrakt: sql<number>`(${users.traktToken} is not null)`,
+      })
       .from(users)
       .where(ne(users.id, request.user!.id))
       .all()
-      .map((u) => ({ id: u.id, username: u.username, hasPlex: !!u.plexToken, hasTrakt: !!u.traktToken }));
+      .map((u) => ({ id: u.id, username: u.username, hasPlex: !!u.hasPlex, hasTrakt: !!u.hasTrakt }));
   });
 
   // Library mode: a random title neither person has seen.

@@ -18,7 +18,9 @@ export function parseFilters(row: ScheduleRow): RandomFilters {
 // Execute one schedule: draw a pick, record it, one-shots disable themselves,
 // and optionally announce on Discord.
 export async function runSchedule(row: ScheduleRow): Promise<typeof media.$inferSelect | null> {
-  const pick = await pickRandomMedia(parseFilters(row), row.createdBy);
+  // An unattended schedule draws only from lists its creator personally owns
+  // or that are shared — never via admin override in a background job.
+  const pick = await pickRandomMedia(parseFilters(row), { id: row.createdBy, isAdmin: false });
   db.update(scheduledPicks)
     .set({
       lastRunAt: new Date(),

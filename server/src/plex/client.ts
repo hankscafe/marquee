@@ -120,7 +120,11 @@ export async function getSessions(baseUrl: string, token: string): Promise<PlexS
 
 // Streams artwork through the server so the Plex token never reaches the browser.
 export async function fetchArtwork(baseUrl: string, token: string, thumbPath: string): Promise<Response> {
-  const url = plexUrl(baseUrl, thumbPath.replace(/^\//, ''));
+  const base = new URL(baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`);
+  const url = new URL(thumbPath.replace(/^\/+/, ''), base);
+  // `thumb` is synced from the media server, but pin the host anyway: an absolute
+  // path would otherwise let new URL() redirect the token-bearing request off-box.
+  if (url.origin !== base.origin) throw new Error('refusing to fetch artwork from an unexpected host');
   url.searchParams.set('X-Plex-Token', token);
   return fetch(url);
 }

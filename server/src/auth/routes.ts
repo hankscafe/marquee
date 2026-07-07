@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { eq, sql } from 'drizzle-orm';
 import * as oidc from 'openid-client';
@@ -24,6 +25,11 @@ const credentialsSchema = z.object({
 
 // Brute-force protection on credential endpoints.
 const AUTH_RATE = { rateLimit: { max: 10, timeWindow: '1 minute' } };
+
+// A throwaway hash so login spends the same scrypt time whether or not the
+// username exists — closes the timing side channel that would otherwise let an
+// attacker enumerate valid local accounts.
+const DUMMY_PASSWORD_HASH = hashPassword(crypto.randomBytes(16).toString('hex'));
 
 function userCount(): number {
   return db.select({ c: sql<number>`count(*)` }).from(users).get()!.c;
@@ -85,7 +91,10 @@ export async function authRoutes(app: FastifyInstance) {
     const parsed = z.object({ username: z.string(), password: z.string() }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
     const user = db.select().from(users).where(eq(users.username, parsed.data.username)).get();
-    if (!user?.passwordHash || !verifyPassword(parsed.data.password, user.passwordHash)) {
+    // Always verify against a hash (a dummy one when the account is missing or
+    // has no local password) so response time doesn't reveal which usernames exist.
+    const passwordOk = verifyPassword(parsed.data.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
+    if (!user?.passwordHash || !passwordOk) {
       logger.warn({ username: parsed.data.username, ip: request.ip }, 'failed login attempt');
       return reply.code(401).send({ error: 'Invalid username or password' });
     }

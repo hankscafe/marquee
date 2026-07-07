@@ -121,7 +121,7 @@ export async function mediaRoutes(app: FastifyInstance) {
   app.post('/api/media/random', { preHandler: requireUser }, async (request, reply) => {
     const parsed = randomFiltersSchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
-    const pick = await pickRandomMedia(parsed.data, request.user!.id);
+    const pick = await pickRandomMedia(parsed.data, request.user!);
     if (!pick) {
       return reply.code(404).send({ error: 'No titles match those filters. Try widening them or sync your library.' });
     }
@@ -161,8 +161,9 @@ export async function mediaRoutes(app: FastifyInstance) {
   });
 
   // Unauthenticated: a random poster for the login-page backdrop. Streams
-  // artwork only — no titles or metadata leave the server.
-  app.get('/api/backdrop', async (_request, reply) => {
+  // artwork only — no titles or metadata leave the server. Rate-limited because
+  // it is pre-auth and drives a token-bearing request to the internal media server.
+  app.get('/api/backdrop', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (_request, reply) => {
     const rows = db
       .select({ source: media.source, thumb: media.thumb })
       .from(media)

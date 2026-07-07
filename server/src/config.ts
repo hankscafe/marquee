@@ -20,6 +20,19 @@ function loadSessionSecret(): string {
   return secret;
 }
 
+// How much to trust X-Forwarded-* headers. Defaults to true (the documented
+// deployment sits behind a reverse proxy that sets them). Set TRUST_PROXY=false
+// when exposing the server directly, otherwise a client can spoof its source IP
+// via X-Forwarded-For and defeat the per-IP auth rate limits. Also accepts a hop
+// count or a comma-separated IP/CIDR allowlist, passed through to Fastify.
+function parseTrustProxy(v: string | undefined): boolean | number | string {
+  if (v === undefined || v === '') return true;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  const n = Number(v);
+  return Number.isInteger(n) ? n : v;
+}
+
 function readVersion(): string {
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../package.json'), 'utf8')) as {
@@ -35,6 +48,7 @@ export const config = {
   version: readVersion(),
   port: Number(process.env.PORT ?? 3000),
   host: process.env.HOST ?? '0.0.0.0',
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   dataDir,
   databasePath: process.env.DATABASE_PATH ?? path.join(dataDir, 'marquee.db'),
   sessionSecret: loadSessionSecret(),

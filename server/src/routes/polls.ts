@@ -205,6 +205,11 @@ export async function pollRoutes(app: FastifyInstance) {
   // Live results over Server-Sent Events; clients refetch on each message.
   app.get('/api/polls/:token/events', { preHandler: requireUser }, (request, reply) => {
     const { token } = request.params as { token: string };
+    // Match GET /api/polls/:token — don't stream a draft poll's events to non-managers.
+    const poll = pollByToken(token);
+    if (!poll || (poll.status === 'draft' && !canManage(poll, request.user!))) {
+      return reply.code(404).send({ error: 'Poll not found' });
+    }
     reply.hijack();
     reply.raw.writeHead(200, {
       'content-type': 'text/event-stream',

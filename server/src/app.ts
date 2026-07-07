@@ -29,7 +29,9 @@ import { watchWithRoutes } from './routes/watchwith.js';
 export async function buildApp() {
   const app = Fastify({
     loggerInstance: logger,
-    trustProxy: true, // honor X-Forwarded-* from the reverse proxy (needed for secure cookies + rate-limit IPs)
+    // Honor X-Forwarded-* from the reverse proxy (needed for secure cookies + rate-limit IPs).
+    // Configurable via TRUST_PROXY so a directly-exposed deployment can turn it off.
+    trustProxy: config.trustProxy,
   });
 
   await app.register(fastifyHelmet, {

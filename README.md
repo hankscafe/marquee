@@ -86,6 +86,7 @@ Open the app, create the first admin account, then in **Admin → Media servers*
 | `DATABASE_PATH` | `$DATA_DIR/marquee.db` | SQLite file location |
 | `SESSION_SECRET` | auto-generated, persisted in `$DATA_DIR` | Cookie signing + secrets-at-rest key |
 | `LOG_LEVEL` | `info` (prod) / `debug` (dev) | `trace`–`error` |
+| `TRUST_PROXY` | `true` | Trust `X-Forwarded-*` from a reverse proxy. Set `false` if exposing the server directly (prevents client IP spoofing that would bypass login rate limits). Also accepts a hop count or IP/CIDR allowlist. |
 
 Everything else — media servers, Trakt, TMDb, Discord, request services, OIDC, the public app URL — is configured in the Admin UI, not env vars.
 
