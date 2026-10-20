@@ -160,6 +160,30 @@ export async function pollRoutes(app: FastifyInstance) {
     return serializePollDetail(poll, request.user!.id);
   });
 
+  // The owner (or an admin) can rename a poll or change its description until voting closes.
+  app.patch('/api/polls/:token', { preHandler: requireUser }, async (request, reply) => {
+    const { token } = request.params as { token: string };
+    const parsed = createPollSchema.pick({ title: true, description: true }).partial().safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
+    const { title, description } = parsed.data;
+    if (title === undefined && description === undefined) return reply.code(400).send({ error: 'Nothing to change' });
+    const poll = pollByToken(token);
+    if (!poll) return reply.code(404).send({ error: 'Poll not found' });
+    if (!canManage(poll, request.user!)) return reply.code(403).send({ error: 'Only the poll owner can do that' });
+    if (poll.status === 'closed') return reply.code(409).send({ error: 'This poll has already closed' });
+
+    db.update(polls)
+      .set({
+        ...(title !== undefined ? { title } : {}),
+        ...(description !== undefined ? { description: description || null } : {}),
+      })
+      .where(eq(polls.id, poll.id))
+      .run();
+    emitPollUpdate(token);
+    void updatePollMessage(poll.id);
+    return serializePollDetail(pollByToken(token)!, request.user!.id);
+  });
+
   app.get('/api/polls/:token', { preHandler: requireUser }, async (request, reply) => {
     const { token } = request.params as { token: string };
     const poll = pollByToken(token);

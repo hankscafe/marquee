@@ -155,7 +155,7 @@ export function PollPage() {
           {poll.discordPosted && <span className="chip self-center bg-neon-500/15 text-neon-300">On Discord ✓</span>}
           {(poll.isOwner || auth?.user?.isAdmin) && poll.status !== 'closed' && (
             <button className="btn btn-ghost" onClick={() => setEditing(true)}>
-              Edit options
+              Edit poll
             </button>
           )}
           {poll.isOwner && poll.status === 'open' && (

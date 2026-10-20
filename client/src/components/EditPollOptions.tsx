@@ -8,10 +8,13 @@ import { Poster } from './Poster';
 // Mirrors the server: 50 options, or 25 once the poll is on Discord (its button grid).
 const optionLimit = (poll: PollDetail) => (poll.discordPosted ? 25 : 50);
 
-// Add or remove a poll's options until voting closes. Each change saves right
-// away, and anyone viewing the poll sees it live.
+// Edit a poll's title, description and options until voting closes. Option
+// changes save right away; the text fields save with Save (or Done). Anyone
+// viewing the poll sees each change live.
 export function EditPollOptions({ poll, onClose }: { poll: PollDetail; onClose: () => void }) {
   const [query, setQuery] = useState('');
+  const [title, setTitle] = useState(poll.title);
+  const [description, setDescription] = useState(poll.description ?? '');
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const token = poll.shareToken;
@@ -39,6 +42,23 @@ export function EditPollOptions({ poll, onClose }: { poll: PollDetail; onClose: 
     onSuccess,
     onError,
   });
+  const saveDetails = useMutation({
+    mutationFn: () =>
+      api<PollDetail>(`/api/polls/${token}`, {
+        method: 'PATCH',
+        body: { title: title.trim(), description: description.trim() },
+      }),
+    onSuccess,
+    onError,
+  });
+
+  const detailsChanged = title.trim() !== poll.title || description.trim() !== (poll.description ?? '');
+  const canSaveDetails = detailsChanged && !!title.trim() && !saveDetails.isPending;
+  // Done keeps unsaved title/description edits instead of silently dropping them.
+  const done = () => {
+    if (detailsChanged && title.trim()) saveDetails.mutate(undefined, { onSuccess: onClose });
+    else onClose();
+  };
 
   const busy = add.isPending || remove.isPending;
   const canRemove = poll.options.length > 2;
@@ -51,21 +71,44 @@ export function EditPollOptions({ poll, onClose }: { poll: PollDetail; onClose: 
       <div className="space-y-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-display text-xl text-neon-300">Edit options</h2>
+            <h2 className="font-display text-xl text-neon-300">Edit poll</h2>
             {poll.status === 'open' && (
               <p className="mt-1 text-xs text-stone-500">
                 Voting is open — changes show up for voters right away. Removing a title discards its votes.
               </p>
             )}
           </div>
-          <button className="btn btn-ghost shrink-0" onClick={onClose}>
+          <button className="btn btn-ghost shrink-0" disabled={saveDetails.isPending} onClick={done}>
             Done
           </button>
         </div>
 
         {error && <p className="text-sm text-crimson-500">{error}</p>}
 
-        <section>
+        <section className="space-y-3">
+          <h3 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Details</h3>
+          <input
+            className="input"
+            placeholder="Poll title, e.g. Friday Movie Night"
+            maxLength={200}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <textarea
+            className="input min-h-20"
+            placeholder="Description (optional)"
+            maxLength={2000}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <div className="flex justify-end">
+            <button className="btn btn-neon" disabled={!canSaveDetails} onClick={() => saveDetails.mutate()}>
+              {saveDetails.isPending ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </section>
+
+        <section className="border-t border-neon-500/10 pt-5">
           <h3 className="mb-3 text-xs font-semibold tracking-widest text-neon-500 uppercase">
             In this poll ({poll.options.length})
           </h3>
