@@ -76,7 +76,10 @@ jobs:
           range="${prev:+$prev..}${GITHUB_REF_NAME}"
           {
             echo "body<<NOTES_EOF"
-            git log --no-merges --pretty='* %s' "$range" | grep -v '^\* Release v' || true
+            # Commit subjects may start with an emoji; release-note titles never do.
+            git log --no-merges --pretty='%s' "$range" \
+              | grep -v '^Release v' \
+              | perl -CS -pe 's/^[\p{Extended_Pictographic}\x{FE0F}\x{200D}\s]+//; s/^/* /' || true
             echo ""
             # Image tags are bare semver (0.6.0), not the git tag (v0.6.0).
             echo "Container image: \`ghcr.io/${{ github.repository }}:${GITHUB_REF_NAME#v}\`"
