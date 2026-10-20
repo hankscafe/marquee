@@ -26,6 +26,9 @@ const credentialsSchema = z.object({
 
 // Brute-force protection on credential endpoints.
 const AUTH_RATE = { rateLimit: { max: 10, timeWindow: '1 minute' } };
+// The Plex login page polls every 3s (20/min); leave room for a few people on one connection.
+const PLEX_POLL_RATE = { rateLimit: { max: 120, timeWindow: '1 minute' } };
+const PLEX_PIN_COOKIE = 'marquee_plex_pin';
 
 // A throwaway hash so login spends the same scrypt time whether or not the
 // username exists — closes the timing side channel that would otherwise let an
@@ -235,21 +238,39 @@ export async function authRoutes(app: FastifyInstance) {
   }
 
   // "Sign in with Plex" step 1: create a PIN and hand back the approval URL.
-  app.post('/api/auth/plex/start', async (request, reply) => {
+  // The PIN is bound to this browser with a short-lived signed cookie, so only
+  // it can finish the sign-in (see step 2).
+  app.post('/api/auth/plex/start', { config: AUTH_RATE }, async (request, reply) => {
     if (userCount() === 0) return reply.code(400).send({ error: 'Complete first-run setup before signing in with Plex' });
     try {
       const pin = await createLoginPin();
       const origin = getSetting('app.url')?.replace(/\/+$/, '') ?? `${request.protocol}://${request.headers.host}`;
+      reply.setCookie(PLEX_PIN_COOKIE, String(pin.id), {
+        path: '/api/auth/plex',
+        httpOnly: true,
+        sameSite: 'lax',
+        signed: true,
+        secure: request.protocol === 'https',
+        maxAge: 10 * 60, // the login page gives up after 5 minutes
+      });
       return { pinId: pin.id, code: pin.code, authUrl: buildAuthUrl(pin.code, `${origin}/login?plexDone=1`) };
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not reach plex.tv' });
     }
   });
 
-  // Step 2: the client polls this until the user approves the PIN in the Plex tab.
-  app.post('/api/auth/plex/complete', async (request, reply) => {
+  // Step 2: the client polls this (every 3s) until the user approves the PIN in the Plex tab.
+  app.post('/api/auth/plex/complete', { config: PLEX_POLL_RATE }, async (request, reply) => {
     const parsed = z.object({ pinId: z.number().int() }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
+
+    // Only the browser that started this sign-in may finish it. Without this,
+    // anyone who guessed another person's PIN id could collect their session.
+    const raw = request.cookies[PLEX_PIN_COOKIE];
+    const unsigned = raw ? request.unsignCookie(raw) : null;
+    if (!unsigned?.valid || unsigned.value !== String(parsed.data.pinId)) {
+      return reply.code(403).send({ error: 'This Plex sign-in has expired or was started elsewhere — try again' });
+    }
 
     let token: string | null;
     try {
@@ -258,6 +279,8 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not reach plex.tv' });
     }
     if (!token) return { pending: true };
+    // The PIN is spent once plex.tv hands over a token, whatever happens next.
+    reply.clearCookie(PLEX_PIN_COOKIE, { path: '/api/auth/plex' });
 
     const cfg = getPlexConfig();
     if (!cfg) return reply.code(503).send({ error: 'Plex is not configured on this server yet — ask your admin' });

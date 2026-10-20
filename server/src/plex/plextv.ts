@@ -123,9 +123,24 @@ async function findServerResource(
   );
 }
 
+// This account's per-server token, once the configured server itself has
+// accepted it — or null. plex.tv's list belongs to the account signing in, and
+// a server's identifier isn't secret, so a look-alike server registered under
+// the same identifier could appear in it. Only the real server accepts tokens
+// for itself. Unreachable server → throws, so sign-in fails closed.
+async function verifiedServerToken(server: { url: string; token: string }, userToken: string): Promise<string | null> {
+  const accessToken = (await findServerResource(server, userToken))?.accessToken;
+  if (!accessToken) return null;
+  const url = new URL('library/sections', server.url.endsWith('/') ? server.url : `${server.url}/`);
+  const res = await fetch(url, { headers: { 'X-Plex-Token': accessToken, Accept: 'application/json' } });
+  if (res.ok) return accessToken;
+  if (res.status === 401 || res.status === 403) return null;
+  throw new Error(`Plex server access check failed (${res.status})`);
+}
+
 // Gate: only the owner and accounts the server is shared with may sign in.
 export async function hasServerAccess(server: { url: string; token: string }, userToken: string): Promise<boolean> {
-  return !!(await findServerResource(server, userToken));
+  return (await verifiedServerToken(server, userToken)) !== null;
 }
 
 // The token to query the server as this account (so UserData is theirs): the
@@ -134,5 +149,5 @@ export async function getServerAccessToken(
   server: { url: string; token: string },
   userToken: string,
 ): Promise<string | null> {
-  return (await findServerResource(server, userToken))?.accessToken ?? null;
+  return verifiedServerToken(server, userToken);
 }
