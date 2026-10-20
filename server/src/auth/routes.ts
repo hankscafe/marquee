@@ -268,7 +268,13 @@ export async function authRoutes(app: FastifyInstance) {
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not reach plex.tv' });
     }
-    if (!(await hasServerAccess(cfg.url, token))) {
+    let allowed;
+    try {
+      allowed = await hasServerAccess(cfg, token);
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not reach plex.tv' });
+    }
+    if (!allowed) {
       return reply.code(403).send({ error: 'Your Plex account does not have access to this Plex server' });
     }
 

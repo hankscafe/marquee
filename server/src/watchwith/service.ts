@@ -3,6 +3,7 @@ import { decryptSecret } from '../crypto.js';
 import { db } from '../db/index.js';
 import { media, users } from '../db/schema.js';
 import { getSectionItems, getSections } from '../plex/client.js';
+import { getServerAccessToken } from '../plex/plextv.js';
 import { getPlexConfig } from '../settings.js';
 import { getWatchedSet } from '../trakt/service.js';
 
@@ -31,11 +32,14 @@ async function plexWatchedSet(userId: number, plexToken: string): Promise<Set<nu
   const set = new Set<number>();
   try {
     // Same server, but queried with the user's token, so UserData is theirs.
-    const sections = (await getSections(cfg.url, plexToken)).filter(
+    // Shared users need their per-server token — the server rejects their account token.
+    const serverToken = await getServerAccessToken(cfg, plexToken);
+    if (!serverToken) return null; // server no longer shared with them
+    const sections = (await getSections(cfg.url, serverToken)).filter(
       (s) => s.type === 'movie' || s.type === 'show',
     );
     for (const section of sections) {
-      const items = await getSectionItems(cfg.url, plexToken, section.key);
+      const items = await getSectionItems(cfg.url, serverToken, section.key);
       for (const item of items) {
         const watched =
           item.type === 'show'

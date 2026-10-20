@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { getSetting, setSetting } from '../settings.js';
+import { getMachineIdentifier } from './client.js';
 
 // plex.tv PIN-based OAuth ("Sign in with Plex"), the same flow Overseerr uses:
 // create a PIN, send the user to app.plex.tv/auth to approve it, then poll the
@@ -100,13 +101,38 @@ export async function getFriends(ownerToken: string): Promise<PlexFriend[]> {
   return Array.isArray(json) ? json : (json.friends ?? []);
 }
 
-// Gate: only Plex accounts that can actually reach the admin's server may sign in.
-export async function hasServerAccess(serverUrl: string, userToken: string): Promise<boolean> {
-  try {
-    const url = new URL('library/sections', serverUrl.endsWith('/') ? serverUrl : `${serverUrl}/`);
-    const res = await fetch(url, { headers: { 'X-Plex-Token': userToken, Accept: 'application/json' } });
-    return res.ok;
-  } catch {
-    return false;
-  }
+// The configured server as plex.tv lists it for this account, or null when it
+// isn't shared with them. Asked of plex.tv rather than the server itself: the
+// server only accepts the owner's plex.tv token — shared and Home users get a
+// separate per-server token from plex.tv — so probing it with their account
+// token always fails.
+async function findServerResource(
+  server: { url: string; token: string },
+  userToken: string,
+): Promise<{ accessToken?: string } | null> {
+  const machineId = (await getMachineIdentifier(server.url, server.token)) ?? getSetting('plex.machineId');
+  if (!machineId) throw new Error('Could not identify the Plex server — check the Plex settings in Admin');
+  const res = await fetch(`${PLEX_TV}/api/v2/resources?includeHttps=1`, {
+    headers: { ...plexTvHeaders(), 'X-Plex-Token': userToken },
+  });
+  if (!res.ok) throw new Error(`plex.tv resources request failed (${res.status})`);
+  const resources = (await res.json()) as { clientIdentifier?: string; provides?: string; accessToken?: string }[];
+  return (
+    resources.find((r) => r.clientIdentifier === machineId && (r.provides ?? '').split(',').includes('server')) ??
+    null
+  );
+}
+
+// Gate: only the owner and accounts the server is shared with may sign in.
+export async function hasServerAccess(server: { url: string; token: string }, userToken: string): Promise<boolean> {
+  return !!(await findServerResource(server, userToken));
+}
+
+// The token to query the server as this account (so UserData is theirs): the
+// owner's own token, or the per-server token plex.tv issued a shared user.
+export async function getServerAccessToken(
+  server: { url: string; token: string },
+  userToken: string,
+): Promise<string | null> {
+  return (await findServerResource(server, userToken))?.accessToken ?? null;
 }
