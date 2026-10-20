@@ -80,6 +80,7 @@ export interface PollOptionResult {
   title: string;
   mediaId: number | null;
   votes: number;
+  voters?: string[]; // who voted for it, only sent to the poll's owner and admins
 }
 
 export interface PollSummary {
@@ -108,6 +109,7 @@ export interface AdminUserInfo {
   emby: boolean;
   discord: boolean;
   oidc: boolean;
+  guest: boolean; // created by a vote on a public poll link
   createdAt: string;
 }
 
@@ -123,10 +125,25 @@ export interface PollDetail {
   discordPosted: boolean;
   pinned: boolean;
   spotlight: boolean;
+  publicToken: string | null; // set while shared at /vote/<token>; only sent to admins
   isOwner: boolean;
   myVoteOptionId: number | null;
   totalVotes: number;
   options: PollOptionResult[];
+}
+
+// A poll as seen through its public link, by someone who may not have an account.
+export interface PublicPoll {
+  title: string;
+  description: string | null;
+  status: PollStatus;
+  closesAt: string | null;
+  winnerOptionId: number | null;
+  signedIn: boolean; // voting as a Marquee account, so no name is needed
+  voterName: string | null; // the name this browser voted with last time
+  myVoteOptionId: number | null;
+  totalVotes: number;
+  options: { id: number; title: string; hasPoster: boolean; votes: number }[];
 }
 
 export interface ListSummary {

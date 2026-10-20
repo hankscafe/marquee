@@ -7,6 +7,7 @@ export const users = sqliteTable('users', {
   plexId: text('plex_id').unique(), // plex.tv account id, set for Plex-authenticated accounts
   plexToken: text('plex_token'), // that account's token, kept for future Watch With / watchlist features
   discordId: text('discord_id').unique(), // set for shadow accounts created by Discord button votes
+  guestId: text('guest_id').unique(), // set for guest accounts created by votes on a public poll link
   jellyfinId: text('jellyfin_id').unique(), // set for Jellyfin-authenticated accounts
   embyId: text('emby_id').unique(), // set for Emby-authenticated accounts
   oidcSub: text('oidc_sub').unique(), // set for OIDC-authenticated accounts (subject claim)
@@ -135,6 +136,8 @@ export const polls = sqliteTable('polls', {
   pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
   // The single admin-chosen "spotlight" poll featured as a hero on the home page.
   spotlight: integer('spotlight', { mode: 'boolean' }).notNull().default(false),
+  // Set while an admin shares the poll at a public link (/vote/<token>) that needs no login.
+  publicToken: text('public_token').unique(),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -163,6 +166,8 @@ export const votes = sqliteTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    // The name a guest typed on a public poll link (null for signed-in and Discord votes).
+    voterName: text('voter_name'),
     createdAt: integer('created_at', { mode: 'timestamp' })
       .notNull()
       .$defaultFn(() => new Date()),

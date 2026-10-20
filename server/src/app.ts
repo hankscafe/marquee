@@ -21,6 +21,7 @@ import { mediaRoutes } from './routes/media.js';
 import { nowPlayingRoutes } from './routes/nowplaying.js';
 import { passkeyRoutes } from './routes/passkeys.js';
 import { pollRoutes } from './routes/polls.js';
+import { publicPollRoutes } from './routes/publicPolls.js';
 import { scheduleRoutes } from './routes/schedules.js';
 import { traktRoutes } from './routes/trakt.js';
 import { versionRoutes } from './routes/version.js';
@@ -45,6 +46,7 @@ export async function buildApp() {
   await app.register(authRoutes);
   await app.register(passkeyRoutes);
   await app.register(pollRoutes);
+  await app.register(publicPollRoutes);
   await app.register(mediaRoutes);
   await app.register(listRoutes);
   await app.register(collectionRoutes);

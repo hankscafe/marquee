@@ -12,6 +12,7 @@ export function PollPage() {
   const { token } = useParams<{ token: string }>();
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [publicCopied, setPublicCopied] = useState(false);
   const [detailsId, setDetailsId] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
   const queryClient = useQueryClient();
@@ -85,14 +86,20 @@ export function PollPage() {
     },
   });
 
-  const share = async () => {
-    const url = window.location.href;
+  // Admins can share a poll at a public link that needs no login to vote.
+  const setPublic = useMutation({
+    mutationFn: (enabled: boolean) => api<PollDetail>(`/api/polls/${token}/public`, { body: { enabled } }),
+    onSuccess: (data) => queryClient.setQueryData(['poll', token], data),
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not update the public link'),
+  });
+
+  const share = async (url: string, setDone: (done: boolean) => void) => {
     if (navigator.share) {
       await navigator.share({ title: poll?.title, url }).catch(() => {});
     } else {
       await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setDone(true);
+      setTimeout(() => setDone(false), 2000);
     }
   };
 
@@ -102,6 +109,7 @@ export function PollPage() {
   const canVote = poll.status === 'open' && poll.myVoteOptionId === null;
   const showResults = poll.myVoteOptionId !== null || poll.status === 'closed' || poll.isOwner;
   const winner = poll.options.find((o) => o.id === poll.winnerOptionId);
+  const publicUrl = poll.publicToken ? `${window.location.origin}/vote/${poll.publicToken}` : null;
 
   return (
     <div className="space-y-6">
@@ -117,9 +125,37 @@ export function PollPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className="btn btn-ghost" onClick={share}>
+          <button className="btn btn-ghost" onClick={() => share(window.location.href, setCopied)}>
             {copied ? 'Link copied!' : 'Share'}
           </button>
+          {auth?.user?.isAdmin && !publicUrl && poll.status !== 'closed' && (
+            <button
+              className="btn btn-ghost"
+              disabled={setPublic.isPending}
+              onClick={() => setPublic.mutate(true)}
+              title="Create a link anyone can vote with — no account needed"
+            >
+              Share publicly
+            </button>
+          )}
+          {auth?.user?.isAdmin && publicUrl && (
+            <>
+              <button className="btn btn-ghost" onClick={() => share(publicUrl, setPublicCopied)}>
+                {publicCopied ? 'Public link copied!' : 'Copy public link'}
+              </button>
+              <button
+                className="btn btn-ghost"
+                disabled={setPublic.isPending}
+                onClick={() => {
+                  if (window.confirm('Stop the public link? Anyone using it will no longer be able to vote.')) {
+                    setPublic.mutate(false);
+                  }
+                }}
+              >
+                Stop public link
+              </button>
+            </>
+          )}
           {auth?.user?.isAdmin && (
             <button className="btn btn-ghost" disabled={togglePin.isPending} onClick={() => togglePin.mutate(!poll.pinned)}>
               {poll.pinned ? 'Unpin' : 'Pin'}
@@ -176,6 +212,15 @@ export function PollPage() {
         </div>
       </div>
 
+      {publicUrl && (
+        <p className="text-sm text-stone-400">
+          Public link — anyone with it can vote, no account needed:{' '}
+          <a href={publicUrl} className="break-all text-neon-300 hover:underline">
+            {publicUrl}
+          </a>
+        </p>
+      )}
+
       {poll.status === 'closed' && winner && (
         <div className="card border-neon-400/40 p-5 text-center">
           <p className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Tonight’s feature</p>
@@ -228,6 +273,11 @@ export function PollPage() {
                     <p className="text-xs text-stone-400">
                       {option.votes} vote{option.votes === 1 ? '' : 's'} · {pct}%
                     </p>
+                    {option.voters && option.voters.length > 0 && (
+                      <p className="truncate text-[11px] text-stone-500" title={option.voters.join(', ')}>
+                        {option.voters.join(', ')}
+                      </p>
+                    )}
                   </>
                 )}
                 </div>

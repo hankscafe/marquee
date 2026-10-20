@@ -19,11 +19,12 @@ function serializeUser(u: typeof users.$inferSelect) {
     emby: !!u.embyId,
     discord: !!u.discordId,
     oidc: !!u.oidcSub,
+    guest: !!u.guestId,
     createdAt: u.createdAt,
   };
 }
 
-function uniqueUsername(preferred: string): string {
+export function uniqueUsername(preferred: string): string {
   let username = preferred;
   let suffix = 1;
   while (db.select({ id: users.id }).from(users).where(eq(users.username, username)).get()) {

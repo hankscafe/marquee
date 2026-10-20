@@ -6,7 +6,7 @@ import { db } from '../db/index.js';
 import { media, pollOptions, polls, votes } from '../db/schema.js';
 import { requireUser } from '../auth/plugin.js';
 import { DISCORD_MAX_OPTIONS, postPollToDiscord, updatePollMessage } from '../discord/bot.js';
-import { emitPollUpdate, pollEvents } from '../events.js';
+import { emitPollUpdate, streamPollEvents } from '../events.js';
 import {
   closePoll,
   getOptionCounts,
@@ -102,7 +102,7 @@ export async function pollRoutes(app: FastifyInstance) {
 
     for (const m of items) db.insert(pollOptions).values(optionFromMedia(poll.id, m)).run();
 
-    return reply.code(201).send(serializePollDetail(poll, request.user!.id));
+    return reply.code(201).send(serializePollDetail(poll, request.user!));
   });
 
   // The owner (or an admin) can add titles until voting closes.
@@ -138,7 +138,7 @@ export async function pollRoutes(app: FastifyInstance) {
     for (const m of items) db.insert(pollOptions).values(optionFromMedia(poll.id, m)).run();
     emitPollUpdate(token);
     void updatePollMessage(poll.id);
-    return serializePollDetail(poll, request.user!.id);
+    return serializePollDetail(poll, request.user!);
   });
 
   // Removing an option discards its votes (they cascade), so those voters can vote again.
@@ -157,7 +157,7 @@ export async function pollRoutes(app: FastifyInstance) {
     db.delete(pollOptions).where(eq(pollOptions.id, option.id)).run();
     emitPollUpdate(token);
     void updatePollMessage(poll.id);
-    return serializePollDetail(poll, request.user!.id);
+    return serializePollDetail(poll, request.user!);
   });
 
   // The owner (or an admin) can rename a poll or change its description until voting closes.
@@ -181,7 +181,7 @@ export async function pollRoutes(app: FastifyInstance) {
       .run();
     emitPollUpdate(token);
     void updatePollMessage(poll.id);
-    return serializePollDetail(pollByToken(token)!, request.user!.id);
+    return serializePollDetail(pollByToken(token)!, request.user!);
   });
 
   app.get('/api/polls/:token', { preHandler: requireUser }, async (request, reply) => {
@@ -191,7 +191,7 @@ export async function pollRoutes(app: FastifyInstance) {
     if (poll.status === 'draft' && !canManage(poll, request.user!)) {
       return reply.code(404).send({ error: 'Poll not found' });
     }
-    return serializePollDetail(poll, request.user!.id);
+    return serializePollDetail(poll, request.user!);
   });
 
   app.post('/api/polls/:token/vote', { preHandler: requireUser }, async (request, reply) => {
@@ -221,7 +221,7 @@ export async function pollRoutes(app: FastifyInstance) {
 
     emitPollUpdate(token);
     void updatePollMessage(poll.id);
-    return serializePollDetail(poll, request.user!.id);
+    return serializePollDetail(poll, request.user!);
   });
 
   // Post this poll to the configured Discord channel with vote buttons.
@@ -232,7 +232,7 @@ export async function pollRoutes(app: FastifyInstance) {
     if (!canManage(poll, request.user!)) return reply.code(403).send({ error: 'Only the poll owner can do that' });
     try {
       await postPollToDiscord(poll.id);
-      return serializePollDetail(pollByToken(token)!, request.user!.id);
+      return serializePollDetail(pollByToken(token)!, request.user!);
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not post to Discord' });
     }
@@ -247,7 +247,7 @@ export async function pollRoutes(app: FastifyInstance) {
     const parsed = z.object({ pinned: z.boolean() }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
     db.update(polls).set({ pinned: parsed.data.pinned }).where(eq(polls.id, poll.id)).run();
-    return serializePollDetail(pollByToken(token)!, request.user!.id);
+    return serializePollDetail(pollByToken(token)!, request.user!);
   });
 
   // Admins can feature one poll as the home-page spotlight. It's singular, so
@@ -265,7 +265,7 @@ export async function pollRoutes(app: FastifyInstance) {
     } else {
       db.update(polls).set({ spotlight: false }).where(eq(polls.id, poll.id)).run();
     }
-    return serializePollDetail(pollByToken(token)!, request.user!.id);
+    return serializePollDetail(pollByToken(token)!, request.user!);
   });
 
   app.post('/api/polls/:token/open', { preHandler: requireUser }, async (request, reply) => {
@@ -276,7 +276,7 @@ export async function pollRoutes(app: FastifyInstance) {
     if (poll.status === 'closed') return reply.code(409).send({ error: 'This poll has already closed' });
     db.update(polls).set({ status: 'open' }).where(eq(polls.id, poll.id)).run();
     emitPollUpdate(token);
-    return serializePollDetail(pollByToken(token)!, request.user!.id);
+    return serializePollDetail(pollByToken(token)!, request.user!);
   });
 
   app.post('/api/polls/:token/close', { preHandler: requireUser }, async (request, reply) => {
@@ -285,7 +285,7 @@ export async function pollRoutes(app: FastifyInstance) {
     if (!poll) return reply.code(404).send({ error: 'Poll not found' });
     if (!canManage(poll, request.user!)) return reply.code(403).send({ error: 'Only the poll owner can do that' });
     closePoll(poll.id);
-    return serializePollDetail(pollByToken(token)!, request.user!.id);
+    return serializePollDetail(pollByToken(token)!, request.user!);
   });
 
   app.delete('/api/polls/:token', { preHandler: requireUser }, async (request, reply) => {
@@ -305,21 +305,6 @@ export async function pollRoutes(app: FastifyInstance) {
     if (!poll || (poll.status === 'draft' && !canManage(poll, request.user!))) {
       return reply.code(404).send({ error: 'Poll not found' });
     }
-    reply.hijack();
-    reply.raw.writeHead(200, {
-      'content-type': 'text/event-stream',
-      'cache-control': 'no-cache, no-transform',
-      connection: 'keep-alive',
-    });
-    reply.raw.write('retry: 3000\n\n');
-
-    const channel = `poll:${token}`;
-    const listener = (payload: unknown) => reply.raw.write(`data: ${JSON.stringify(payload)}\n\n`);
-    pollEvents.on(channel, listener);
-    const heartbeat = setInterval(() => reply.raw.write(': ping\n\n'), 25_000);
-    request.raw.on('close', () => {
-      clearInterval(heartbeat);
-      pollEvents.off(channel, listener);
-    });
+    streamPollEvents(request, reply, token);
   });
 }

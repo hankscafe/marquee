@@ -50,6 +50,31 @@ export function serializeMedia(row: typeof media.$inferSelect) {
   };
 }
 
+// Poster proxy: streams artwork from the source server so tokens/keys stay server-side.
+export async function streamPoster(
+  item: { source: 'plex' | 'jellyfin' | 'emby'; thumb: string | null },
+  reply: FastifyReply,
+  cacheControl: string,
+) {
+  if (!item.thumb) return reply.code(404).send({ error: 'No poster available' });
+  let res: Response;
+  if (item.source === 'plex') {
+    const cfg = getPlexConfig();
+    if (!cfg) return reply.code(404).send({ error: 'Plex is not configured' });
+    res = await fetchArtwork(cfg.url, cfg.token, item.thumb);
+  } else {
+    try {
+      res = await fetchJfArtwork(item.source, item.thumb);
+    } catch (err) {
+      return reply.code(404).send({ error: err instanceof Error ? err.message : 'Source not configured' });
+    }
+  }
+  if (!res.ok) return reply.code(502).send({ error: 'Failed to fetch poster from the media server' });
+  reply.header('content-type', res.headers.get('content-type') ?? 'image/jpeg');
+  reply.header('cache-control', cacheControl);
+  return reply.send(Buffer.from(await res.arrayBuffer()));
+}
+
 export async function mediaRoutes(app: FastifyInstance) {
   app.get('/api/media', { preHandler: requireUser }, async (request) => {
     const { q, type, sort, section, genre } = request.query as {
@@ -127,31 +152,6 @@ export async function mediaRoutes(app: FastifyInstance) {
     }
     return serializeMedia(pick);
   });
-
-  // Poster proxy: streams artwork from the source server so tokens/keys stay server-side.
-  async function streamPoster(
-    item: { source: 'plex' | 'jellyfin' | 'emby'; thumb: string | null },
-    reply: FastifyReply,
-    cacheControl: string,
-  ) {
-    if (!item.thumb) return reply.code(404).send({ error: 'No poster available' });
-    let res: Response;
-    if (item.source === 'plex') {
-      const cfg = getPlexConfig();
-      if (!cfg) return reply.code(404).send({ error: 'Plex is not configured' });
-      res = await fetchArtwork(cfg.url, cfg.token, item.thumb);
-    } else {
-      try {
-        res = await fetchJfArtwork(item.source, item.thumb);
-      } catch (err) {
-        return reply.code(404).send({ error: err instanceof Error ? err.message : 'Source not configured' });
-      }
-    }
-    if (!res.ok) return reply.code(502).send({ error: 'Failed to fetch poster from the media server' });
-    reply.header('content-type', res.headers.get('content-type') ?? 'image/jpeg');
-    reply.header('cache-control', cacheControl);
-    return reply.send(Buffer.from(await res.arrayBuffer()));
-  }
 
   app.get('/api/media/:id/poster', { preHandler: requireUser }, async (request, reply) => {
     const id = Number((request.params as { id: string }).id);

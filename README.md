@@ -11,7 +11,7 @@
 
 ### Polls
 
-Pick titles from your library (search, filter by library or genre, or add a whole collection at once), share via link, and vote by tapping a poster — **one vote per person, enforced by the database**. Results update live for everyone watching. Polls can auto-open and auto-close on a schedule, with the winner computed automatically (ties go to the title that reached the top count first). Rename a poll, change its description, or add and remove titles any time before voting closes. Admins can pin important polls to the top.
+Pick titles from your library (search, filter by library or genre, or add a whole collection at once), share via link, and vote by tapping a poster — **one vote per person, enforced by the database**. Results update live for everyone watching. Polls can auto-open and auto-close on a schedule, with the winner computed automatically (ties go to the title that reached the top count first). Rename a poll, change its description, or add and remove titles any time before voting closes. Admins can pin important polls to the top, or share one at a public link so people without an account can vote — they give their name, and each browser gets one vote.
 
 ![Polls](docs/screenshots/polls.png)
 

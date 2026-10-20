@@ -105,6 +105,7 @@ function UsersPanel() {
       u.emby && 'Emby',
       u.discord && 'Discord',
       u.oidc && 'SSO',
+      u.guest && 'public poll guest',
     ].filter(Boolean) as string[];
 
   return (

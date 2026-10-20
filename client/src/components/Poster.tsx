@@ -1,8 +1,20 @@
 import { useState } from 'react';
 
-export function Poster({ mediaId, title, className = '' }: { mediaId: number | null; title: string; className?: string }) {
+// `src` overrides the signed-in poster URL (the public poll page serves its own).
+export function Poster({
+  mediaId,
+  title,
+  src,
+  className = '',
+}: {
+  mediaId: number | null;
+  title: string;
+  src?: string;
+  className?: string;
+}) {
   const [failed, setFailed] = useState(false);
-  if (!mediaId || failed) {
+  const url = src ?? (mediaId ? `/api/media/${mediaId}/poster` : null);
+  if (!url || failed) {
     return (
       <div className={`flex aspect-[2/3] items-center justify-center bg-ink-700 text-3xl ${className}`} aria-label={title}>
         🎬
@@ -11,7 +23,7 @@ export function Poster({ mediaId, title, className = '' }: { mediaId: number | n
   }
   return (
     <img
-      src={`/api/media/${mediaId}/poster`}
+      src={url}
       alt={title}
       loading="lazy"
       onError={() => setFailed(true)}

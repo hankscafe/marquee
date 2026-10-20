@@ -10,6 +10,7 @@ import { Login } from './pages/Login';
 import { NewPoll } from './pages/NewPoll';
 import { PollPage } from './pages/PollPage';
 import { PosterMode } from './pages/PosterMode';
+import { PublicPoll } from './pages/PublicPoll';
 import { Randomizer } from './pages/Randomizer';
 import { ReportIssue } from './pages/ReportIssue';
 import { WatchWith } from './pages/WatchWith';
@@ -18,6 +19,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      {/* Public poll link: no login needed to vote */}
+      <Route path="/vote/:publicToken" element={<PublicPoll />} />
       <Route
         path="/poster"
         element={

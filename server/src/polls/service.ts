@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { media, pollOptions, polls, votes } from '../db/schema.js';
+import { media, pollOptions, polls, users, votes } from '../db/schema.js';
 import { notifyPollClosed } from '../discord/bot.js';
 import { emitPollUpdate } from '../events.js';
 
@@ -60,7 +60,23 @@ export function closePoll(pollId: number) {
   return db.select().from(polls).where(eq(polls.id, pollId)).get() ?? null;
 }
 
-export function serializePollDetail(poll: typeof polls.$inferSelect, userId: number) {
+// Who voted for what, by display name: the name a guest typed on the public
+// link, otherwise the account's username. Only shown to the poll's managers.
+function votersByOption(pollId: number): Map<number, string[]> {
+  const rows = db
+    .select({ optionId: votes.optionId, voterName: votes.voterName, username: users.username })
+    .from(votes)
+    .innerJoin(users, eq(votes.userId, users.id))
+    .where(eq(votes.pollId, pollId))
+    .orderBy(votes.createdAt)
+    .all();
+  const byOption = new Map<number, string[]>();
+  for (const r of rows) byOption.set(r.optionId, [...(byOption.get(r.optionId) ?? []), r.voterName ?? r.username]);
+  return byOption;
+}
+
+export function serializePollDetail(poll: typeof polls.$inferSelect, viewer: { id: number; isAdmin: boolean }) {
+  const userId = viewer.id;
   const options = db.select().from(pollOptions).where(eq(pollOptions.pollId, poll.id)).all();
   const counts = getOptionCounts(poll.id);
   const myVote = db
@@ -68,6 +84,7 @@ export function serializePollDetail(poll: typeof polls.$inferSelect, userId: num
     .from(votes)
     .where(and(eq(votes.pollId, poll.id), eq(votes.userId, userId)))
     .get();
+  const voters = poll.createdBy === userId || viewer.isAdmin ? votersByOption(poll.id) : null;
   return {
     id: poll.id,
     title: poll.title,
@@ -80,6 +97,8 @@ export function serializePollDetail(poll: typeof polls.$inferSelect, userId: num
     discordPosted: !!poll.discordMessageId,
     pinned: poll.pinned,
     spotlight: poll.spotlight,
+    // Only admins can share publicly, so only they get the public link.
+    publicToken: viewer.isAdmin ? poll.publicToken : null,
     isOwner: poll.createdBy === userId,
     myVoteOptionId: myVote?.optionId ?? null,
     totalVotes: [...counts.values()].reduce((a, b) => a + b, 0),
@@ -87,6 +106,50 @@ export function serializePollDetail(poll: typeof polls.$inferSelect, userId: num
       id: o.id,
       title: o.title,
       mediaId: o.mediaId,
+      votes: counts.get(o.id) ?? 0,
+      ...(voters ? { voters: voters.get(o.id) ?? [] } : {}),
+    })),
+  };
+}
+
+// What a visitor of a public poll link sees: no management details, no voter
+// names. voterId is the signed-in account or this browser's guest account.
+export function serializePublicPoll(poll: typeof polls.$inferSelect, voterId: number | null, signedIn: boolean) {
+  const options = db.select().from(pollOptions).where(eq(pollOptions.pollId, poll.id)).all();
+  const counts = getOptionCounts(poll.id);
+  const myVote =
+    voterId === null
+      ? undefined
+      : db
+          .select({ optionId: votes.optionId })
+          .from(votes)
+          .where(and(eq(votes.pollId, poll.id), eq(votes.userId, voterId)))
+          .get();
+  // Prefill the name a returning guest used last time.
+  const lastName =
+    voterId === null || signedIn
+      ? undefined
+      : db
+          .select({ voterName: votes.voterName })
+          .from(votes)
+          .where(eq(votes.userId, voterId))
+          .orderBy(desc(votes.createdAt))
+          .limit(1)
+          .get();
+  return {
+    title: poll.title,
+    description: poll.description,
+    status: poll.status,
+    closesAt: poll.closesAt,
+    winnerOptionId: poll.winnerOptionId,
+    signedIn,
+    voterName: lastName?.voterName ?? null,
+    myVoteOptionId: myVote?.optionId ?? null,
+    totalVotes: [...counts.values()].reduce((a, b) => a + b, 0),
+    options: options.map((o) => ({
+      id: o.id,
+      title: o.title,
+      hasPoster: o.mediaId !== null,
       votes: counts.get(o.id) ?? 0,
     })),
   };
