@@ -87,7 +87,9 @@ export interface TraktIds {
 }
 
 export async function getWatched(clientId: string, token: string, type: 'movies' | 'shows'): Promise<TraktIds[]> {
-  const res = await fetch(`${TRAKT}/sync/watched/${type}`, { headers: traktHeaders(clientId, token) });
+  // Shows would otherwise come with every season and episode watched — only the ids are used.
+  const query = type === 'shows' ? '?extended=noseasons' : '';
+  const res = await fetch(`${TRAKT}/sync/watched/${type}${query}`, { headers: traktHeaders(clientId, token) });
   if (res.status === 401 || res.status === 403) throw new TraktAuthError('Trakt token rejected');
   if (!res.ok) throw new Error(`Trakt watched-${type} request failed (${res.status})`);
   const json = (await res.json()) as ({ movie?: { ids?: TraktIds } } & { show?: { ids?: TraktIds } })[];

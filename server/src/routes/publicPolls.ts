@@ -156,7 +156,7 @@ export async function publicPollRoutes(app: FastifyInstance) {
     }
 
     emitPollUpdate(poll.shareToken);
-    void updatePollMessage(poll.id);
+    updatePollMessage(poll.id);
     return serializePublicPoll(poll, userId, !!request.user);
   });
 

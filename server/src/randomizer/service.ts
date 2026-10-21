@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { and, eq, gte, isNull, like, lte, type SQL } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { collectionItems, listItems, lists, media } from '../db/schema.js';
-import { dedupeMedia } from '../sources/dedupe.js';
+import { dedupeColumns, dedupeMedia, fullRow, type DedupeFields } from '../sources/dedupe.js';
 import { watchedSetForUser } from '../watchwith/service.js';
 
 export interface RandomFilters {
@@ -34,29 +34,28 @@ export async function pickRandomMedia(
   if (filters.minRating) conditions.push(gte(media.rating, filters.minRating));
   const where = and(...conditions);
 
-  let rows: (typeof media.$inferSelect)[];
+  // Only what deduping needs: the pool can be the whole library.
+  let rows: DedupeFields[];
   if (filters.listId) {
     // Same visibility rule as GET /api/lists/:id — owner, shared, or admin.
     // Anything else is treated as "no match" so it can't be enumerated.
     const list = db.select().from(lists).where(eq(lists.id, filters.listId)).get();
     if (!list || !(list.isShared || list.ownerId === viewer.id || viewer.isAdmin)) return null;
     rows = db
-      .select({ media })
+      .select(dedupeColumns)
       .from(listItems)
       .innerJoin(media, eq(listItems.mediaId, media.id))
       .where(and(eq(listItems.listId, filters.listId), ...conditions))
-      .all()
-      .map((r) => r.media);
+      .all();
   } else if (filters.collectionId) {
     rows = db
-      .select({ media })
+      .select(dedupeColumns)
       .from(collectionItems)
       .innerJoin(media, eq(collectionItems.mediaId, media.id))
       .where(and(eq(collectionItems.collectionId, filters.collectionId), ...conditions))
-      .all()
-      .map((r) => r.media);
+      .all();
   } else {
-    rows = db.select().from(media).where(where).all();
+    rows = db.select(dedupeColumns).from(media).where(where).all();
   }
 
   // Cross-source duplicates would double-weight the draw — collapse them first.
@@ -68,5 +67,5 @@ export async function pickRandomMedia(
     pool = pool.filter((r) => !r.copyIds.some((id) => set.has(id)));
   }
 
-  return pool.length ? pool[crypto.randomInt(pool.length)]! : null;
+  return pool.length ? fullRow(pool[crypto.randomInt(pool.length)]!) : null;
 }

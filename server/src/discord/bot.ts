@@ -158,9 +158,25 @@ export async function postPollToDiscord(pollId: number): Promise<void> {
     .run();
 }
 
+// Votes can land in bursts (a room voting at once), and each embed edit counts
+// against Discord's rate limits. So a change schedules one edit a moment later,
+// which shows whatever the counts are by then; changes in between ride along.
+const EDIT_DELAY_MS = 1500;
+const pendingEdits = new Map<number, NodeJS.Timeout>();
+
+export function updatePollMessage(pollId: number): void {
+  if (!client?.isReady() || pendingEdits.has(pollId)) return;
+  const timer = setTimeout(() => {
+    pendingEdits.delete(pollId);
+    void editPollMessage(pollId);
+  }, EDIT_DELAY_MS);
+  timer.unref();
+  pendingEdits.set(pollId, timer);
+}
+
 // Refresh the embed's counts (e.g. after an in-app vote) and rebuild the vote
 // buttons, since options can be added or removed while a poll is open. Best-effort.
-export async function updatePollMessage(pollId: number): Promise<void> {
+async function editPollMessage(pollId: number): Promise<void> {
   try {
     const poll = db.select().from(polls).where(eq(polls.id, pollId)).get();
     if (!poll) return;

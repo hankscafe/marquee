@@ -20,15 +20,20 @@ function libraryTmdbIds(): Map<string, number> {
 export async function franchiseRoutes(app: FastifyInstance) {
   app.get('/api/franchises', { preHandler: requireUser }, async (request) => {
     const lib = libraryTmdbIds();
+    // Every franchise's parts in one query, grouped here.
+    const partsOf = new Map<number, string[]>();
+    for (const p of db
+      .select({ collectionId: tmdbCollectionParts.collectionId, tmdbMovieId: tmdbCollectionParts.tmdbMovieId })
+      .from(tmdbCollectionParts)
+      .all()) {
+      if (!partsOf.has(p.collectionId)) partsOf.set(p.collectionId, []);
+      partsOf.get(p.collectionId)!.push(p.tmdbMovieId);
+    }
     const cols = db.select().from(tmdbCollections).orderBy(asc(tmdbCollections.name)).all();
     const franchises = cols
       .map((c) => {
-        const parts = db
-          .select({ tmdbMovieId: tmdbCollectionParts.tmdbMovieId })
-          .from(tmdbCollectionParts)
-          .where(eq(tmdbCollectionParts.collectionId, c.id))
-          .all();
-        const owned = parts.filter((p) => lib.has(p.tmdbMovieId)).length;
+        const parts = partsOf.get(c.id) ?? [];
+        const owned = parts.filter((id) => lib.has(id)).length;
         return { id: c.id, name: c.name, total: parts.length, owned, missing: parts.length - owned };
       })
       .filter((f) => f.total > 0 && f.owned > 0);

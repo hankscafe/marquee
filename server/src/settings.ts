@@ -18,11 +18,17 @@ const SECRET_KEYS = new Set([
   'widget.apiKey',
 ]);
 
+// Settings are read on almost every request — some lists read one per row —
+// but only change through setSetting, so values are kept in memory (decrypted)
+// after their first read and updated on every write.
+const cache = new Map<string, string | null>();
+
 export function getSetting(key: string): string | null {
+  if (cache.has(key)) return cache.get(key)!;
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
-  if (!row) return null;
-  const value = SECRET_KEYS.has(key) ? decryptSecret(row.value) : row.value;
-  return value || null;
+  const value = (row && (SECRET_KEYS.has(key) ? decryptSecret(row.value) : row.value)) || null;
+  cache.set(key, value);
+  return value;
 }
 
 export function setSetting(key: string, value: string) {
@@ -31,6 +37,7 @@ export function setSetting(key: string, value: string) {
     .values({ key, value: stored })
     .onConflictDoUpdate({ target: settings.key, set: { value: stored } })
     .run();
+  cache.set(key, value || null);
 }
 
 // One-time upgrade: encrypt any secrets written before encryption-at-rest existed.

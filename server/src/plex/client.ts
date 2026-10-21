@@ -134,11 +134,26 @@ export async function getSessions(baseUrl: string, token: string): Promise<PlexS
 }
 
 // Streams artwork through the server so the Plex token never reaches the browser.
-export async function fetchArtwork(baseUrl: string, token: string, thumbPath: string): Promise<Response> {
-  const url = serverUrl(baseUrl, thumbPath);
+// Plex keeps posters at full size (often 2000+ px tall), so its photo
+// transcoder scales them to `width` first; if that fails, the original is sent.
+export async function fetchArtwork(baseUrl: string, token: string, thumbPath: string, width: number): Promise<Response> {
+  const original = serverUrl(baseUrl, thumbPath);
   // `thumb` is synced from the media server, but pin the host anyway: an absolute
   // path would otherwise let new URL() redirect the token-bearing request off-box.
-  if (url.origin !== new URL(baseUrl).origin) throw new Error('refusing to fetch artwork from an unexpected host');
-  url.searchParams.set('X-Plex-Token', token);
-  return fetch(url, { signal: AbortSignal.timeout(ARTWORK_TIMEOUT_MS) });
+  if (original.origin !== new URL(baseUrl).origin) throw new Error('refusing to fetch artwork from an unexpected host');
+  original.searchParams.set('X-Plex-Token', token);
+
+  const resized = serverUrl(baseUrl, 'photo/:/transcode');
+  resized.search = new URLSearchParams({
+    url: `/${thumbPath.replace(/^\/+/, '')}`, // the server's own path, whatever proxy prefix baseUrl has
+    width: String(width),
+    height: String(Math.round(width * 1.5)), // posters are 2:3
+    minSize: '1',
+    upscale: '0',
+    'X-Plex-Token': token,
+  }).toString();
+  const res = await fetch(resized, { signal: AbortSignal.timeout(ARTWORK_TIMEOUT_MS) });
+  if (res.ok) return res;
+  void res.body?.cancel();
+  return fetch(original, { signal: AbortSignal.timeout(ARTWORK_TIMEOUT_MS) });
 }

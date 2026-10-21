@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { and, asc, eq, isNotNull, isNull, like, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
@@ -56,22 +57,35 @@ export function serializeMedia(row: typeof media.$inferSelect) {
   };
 }
 
+// Poster sizes the media servers are asked for. A few fixed widths keep
+// browser caching effective: grids get the default, Poster Mode's wall display
+// the large one, the login backdrop's small tiles the small one.
+const POSTER_WIDTHS = [300, 600, 1200] as const;
+const DEFAULT_POSTER_WIDTH = 600;
+
+function posterWidth(requested: unknown): number {
+  const n = Number(requested);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_POSTER_WIDTH;
+  return POSTER_WIDTHS.find((w) => w >= n) ?? POSTER_WIDTHS[POSTER_WIDTHS.length - 1];
+}
+
 // Poster proxy: streams artwork from the source server so tokens/keys stay server-side.
 export async function streamPoster(
   item: { source: 'plex' | 'jellyfin' | 'emby'; thumb: string | null },
   reply: FastifyReply,
   cacheControl: string,
+  width = DEFAULT_POSTER_WIDTH,
 ) {
   if (!item.thumb) return reply.code(404).send({ error: 'No poster available' });
   let request: () => Promise<Response>;
   if (item.source === 'plex') {
     const cfg = getPlexConfig();
     if (!cfg) return reply.code(404).send({ error: 'Plex is not configured' });
-    request = () => fetchArtwork(cfg.url, cfg.token, item.thumb!);
+    request = () => fetchArtwork(cfg.url, cfg.token, item.thumb!, width);
   } else {
     const kind = item.source;
     if (!getJfConfig(kind)) return reply.code(404).send({ error: `${kind} is not configured` });
-    request = () => fetchJfArtwork(kind, item.thumb!);
+    request = () => fetchJfArtwork(kind, item.thumb!, width);
   }
   let res: Response;
   try {
@@ -86,7 +100,8 @@ export async function streamPoster(
   }
   reply.header('content-type', res.headers.get('content-type') ?? 'image/jpeg');
   reply.header('cache-control', cacheControl);
-  return reply.send(Buffer.from(await res.arrayBuffer()));
+  // Passed through as it arrives rather than held in memory first.
+  return reply.send(res.body ? Readable.fromWeb(res.body) : '');
 }
 
 export async function mediaRoutes(app: FastifyInstance) {
@@ -115,7 +130,7 @@ export async function mediaRoutes(app: FastifyInstance) {
     return dedupeMedia(rows).slice(0, RESULTS_PER_PAGE).map(serializeMedia);
   });
 
-  // Filter options for the randomizer: library sections, genres, and Plex collections.
+  // Filter options for the randomizer: library sections, genres, and collections.
   app.get('/api/media/filters', { preHandler: requireUser }, async () => {
     const onServer = isNull(media.removedAt);
     const sections = db
@@ -175,21 +190,30 @@ export async function mediaRoutes(app: FastifyInstance) {
 
   app.get('/api/media/:id/poster', { preHandler: requireUser }, async (request, reply) => {
     const id = Number((request.params as { id: string }).id);
-    const item = db.select().from(media).where(eq(media.id, id)).get();
+    const item = db.select({ source: media.source, thumb: media.thumb }).from(media).where(eq(media.id, id)).get();
     if (!item) return reply.code(404).send({ error: 'No poster available' });
-    return streamPoster(item, reply, 'private, max-age=86400');
+    return streamPoster(item, reply, 'private, max-age=86400', posterWidth((request.query as { w?: string }).w));
   });
 
   // Unauthenticated: a random poster for the login-page backdrop. Streams
   // artwork only — no titles or metadata leave the server. Rate-limited because
   // it is pre-auth and drives a token-bearing request to the internal media server.
   app.get('/api/backdrop', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (_request, reply) => {
-    const rows = db
-      .select({ source: media.source, thumb: media.thumb })
-      .from(media)
-      .where(and(isNotNull(media.thumb), isNull(media.removedAt)))
-      .all();
-    if (!rows.length) return reply.code(404).send({ error: 'No artwork yet' });
-    return streamPoster(rows[crypto.randomInt(rows.length)]!, reply, 'no-store');
+    // One random row, chosen by position, rather than loading every poster path.
+    const withArt = and(isNotNull(media.thumb), isNull(media.removedAt));
+    const count = db.select({ n: sql<number>`count(*)` }).from(media).where(withArt).get()!.n;
+    const row =
+      count > 0
+        ? db
+            .select({ source: media.source, thumb: media.thumb })
+            .from(media)
+            .where(withArt)
+            .limit(1)
+            .offset(crypto.randomInt(count))
+            .get()
+        : undefined;
+    if (!row) return reply.code(404).send({ error: 'No artwork yet' });
+    // The login page's backdrop tiles are small and faded.
+    return streamPoster(row, reply, 'no-store', POSTER_WIDTHS[0]);
   });
 }

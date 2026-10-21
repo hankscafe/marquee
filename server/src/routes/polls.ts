@@ -9,7 +9,7 @@ import { DISCORD_MAX_OPTIONS, postPollToDiscord, updatePollMessage } from '../di
 import { emitPollUpdate, streamPollEvents } from '../events.js';
 import { pruneGuestsWithoutVotes } from '../polls/guests.js';
 import { closePoll, MAX_POLL_OPTIONS, optionFromMedia, pollableMedia, serializePollDetail } from '../polls/service.js';
-import { castVote, getOptionCounts } from '../polls/votes.js';
+import { castVote, optionsWithVotes } from '../polls/votes.js';
 
 // Posting to Discord speaks as the bot in a shared channel, so keep it slow.
 const DISCORD_POST_RATE = { rateLimit: { max: 10, timeWindow: '1 minute' } };
@@ -48,14 +48,9 @@ export async function pollRoutes(app: FastifyInstance) {
       .orderBy(desc(polls.pinned), desc(polls.createdAt))
       .limit(100)
       .all();
+    const optionsOf = optionsWithVotes(rows.map((p) => p.id));
     return rows.map((p) => {
-      const counts = getOptionCounts(p.id);
-      const options = db
-        .select()
-        .from(pollOptions)
-        .where(eq(pollOptions.pollId, p.id))
-        .all()
-        .map((o) => ({ id: o.id, title: o.title, mediaId: o.mediaId, votes: counts.get(o.id) ?? 0 }));
+      const options = optionsOf.get(p.id)!;
       const voteCount = options.reduce((a, o) => a + o.votes, 0);
       return {
         id: p.id,
@@ -131,7 +126,7 @@ export async function pollRoutes(app: FastifyInstance) {
 
     for (const m of items) db.insert(pollOptions).values(optionFromMedia(poll.id, m)).run();
     emitPollUpdate(token);
-    void updatePollMessage(poll.id);
+    updatePollMessage(poll.id);
     return serializePollDetail(poll, request.user!);
   });
 
@@ -151,7 +146,7 @@ export async function pollRoutes(app: FastifyInstance) {
     db.delete(pollOptions).where(eq(pollOptions.id, option.id)).run();
     pruneGuestsWithoutVotes(); // its votes went with it
     emitPollUpdate(token);
-    void updatePollMessage(poll.id);
+    updatePollMessage(poll.id);
     return serializePollDetail(poll, request.user!);
   });
 
@@ -175,7 +170,7 @@ export async function pollRoutes(app: FastifyInstance) {
       .where(eq(polls.id, poll.id))
       .run();
     emitPollUpdate(token);
-    void updatePollMessage(poll.id);
+    updatePollMessage(poll.id);
     return serializePollDetail(pollByToken(token)!, request.user!);
   });
 
@@ -209,7 +204,7 @@ export async function pollRoutes(app: FastifyInstance) {
     }
 
     emitPollUpdate(token);
-    void updatePollMessage(poll.id);
+    updatePollMessage(poll.id);
     return serializePollDetail(poll, request.user!);
   });
 

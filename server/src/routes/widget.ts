@@ -3,8 +3,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { desc, eq, ne } from 'drizzle-orm';
 import type { WidgetPoll, WidgetPollsResponse } from '@marquee/shared';
 import { db } from '../db/index.js';
-import { pollOptions, polls } from '../db/schema.js';
-import { getOptionCounts } from '../polls/votes.js';
+import { polls } from '../db/schema.js';
+import { optionsWithVotes, type OptionWithVotes } from '../polls/votes.js';
 import { getAppUrl, getSetting } from '../settings.js';
 
 // Constant-time key comparison so a wrong key can't be timed out character by character.
@@ -24,15 +24,14 @@ function extractKey(request: FastifyRequest): string | null {
   return null;
 }
 
-function serializeWidgetPoll(poll: typeof polls.$inferSelect, appUrl: string | null): WidgetPoll {
-  const options = db.select().from(pollOptions).where(eq(pollOptions.pollId, poll.id)).all();
-  const counts = getOptionCounts(poll.id);
-  const total = [...counts.values()].reduce((a, b) => a + b, 0);
+function serializeWidgetPoll(
+  poll: typeof polls.$inferSelect,
+  options: OptionWithVotes[],
+  appUrl: string | null,
+): WidgetPoll {
+  const total = options.reduce((a, o) => a + o.votes, 0);
   const ranked = options
-    .map((o) => {
-      const votes = counts.get(o.id) ?? 0;
-      return { id: o.id, title: o.title, votes, percent: total > 0 ? Math.round((votes / total) * 100) : 0 };
-    })
+    .map((o) => ({ id: o.id, title: o.title, votes: o.votes, percent: total > 0 ? Math.round((o.votes / total) * 100) : 0 }))
     .sort((a, b) => b.votes - a.votes);
   const strip = ({ title, votes, percent }: (typeof ranked)[number]) => ({ title, votes, percent });
   const winnerOpt = poll.winnerOptionId != null ? ranked.find((o) => o.id === poll.winnerOptionId) : undefined;
@@ -66,9 +65,8 @@ export async function widgetRoutes(app: FastifyInstance) {
     const spotlightOnly = query.spotlight === '1' || query.spotlight === 'true' || query.only === 'spotlight';
 
     const spotRow = db.select().from(polls).where(eq(polls.spotlight, true)).get();
-    const spotlight = spotRow ? serializeWidgetPoll(spotRow, appUrl) : null;
-
     if (spotlightOnly) {
+      const spotlight = spotRow ? serializeWidgetPoll(spotRow, optionsWithVotes([spotRow.id]).get(spotRow.id)!, appUrl) : null;
       return { generatedAt: new Date().toISOString(), spotlight } satisfies WidgetPollsResponse;
     }
 
@@ -84,11 +82,12 @@ export async function widgetRoutes(app: FastifyInstance) {
       .filter((p) => p.id !== spotRow?.id);
     const rank = (s: string) => (s === 'open' ? 0 : 1);
     const ordered = rows.sort((a, b) => rank(a.status) - rank(b.status)).slice(0, 20);
+    const optionsOf = optionsWithVotes([...(spotRow ? [spotRow.id] : []), ...ordered.map((p) => p.id)]);
 
     return {
       generatedAt: new Date().toISOString(),
-      spotlight,
-      polls: ordered.map((p) => serializeWidgetPoll(p, appUrl)),
+      spotlight: spotRow ? serializeWidgetPoll(spotRow, optionsOf.get(spotRow.id)!, appUrl) : null,
+      polls: ordered.map((p) => serializeWidgetPoll(p, optionsOf.get(p.id)!, appUrl)),
     } satisfies WidgetPollsResponse;
   });
 }

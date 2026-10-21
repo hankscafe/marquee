@@ -194,10 +194,10 @@ export async function fetchJfSessions(kind: JfKind): Promise<JfSessionInfo[]> {
   return jfGet<JfSessionInfo[]>(cfg, '/Sessions', 5000);
 }
 
-export async function fetchJfArtwork(kind: JfKind, itemId: string): Promise<Response> {
+export async function fetchJfArtwork(kind: JfKind, itemId: string, width: number): Promise<Response> {
   const cfg = getJfConfig(kind);
   if (!cfg) throw new Error(`${kind} is not configured`);
-  return fetch(serverUrl(cfg.url, `Items/${encodeURIComponent(itemId)}/Images/Primary?maxWidth=600`), {
+  return fetch(serverUrl(cfg.url, `Items/${encodeURIComponent(itemId)}/Images/Primary?maxWidth=${width}`), {
     headers: { 'X-Emby-Token': cfg.apiKey },
     signal: AbortSignal.timeout(ARTWORK_TIMEOUT_MS),
   });

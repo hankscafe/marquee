@@ -9,7 +9,7 @@ import { decryptSecret } from '../crypto.js';
 import { isMemberAccount } from '../polls/guests.js';
 import { canRequest } from '../seerr/client.js';
 import { requesterFor } from './requests.js';
-import { dedupeMedia } from '../sources/dedupe.js';
+import { dedupeColumns, dedupeMedia, fullRow } from '../sources/dedupe.js';
 import { fetchWatchlist, watchedSetForUser, watchlistKey } from '../watchwith/service.js';
 import { serializeMedia } from './media.js';
 
@@ -55,7 +55,7 @@ export async function watchWithRoutes(app: FastifyInstance) {
 
     const rows = dedupeMedia(
       db
-        .select()
+        .select(dedupeColumns)
         .from(media)
         .where(and(isNull(media.removedAt), parsed.data.type ? eq(media.type, parsed.data.type) : undefined))
         .all(),
@@ -67,8 +67,10 @@ export async function watchWithRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'No titles left that neither of you has seen — impressive. Try widening the filter.' });
     }
 
+    const pick = fullRow(pool[crypto.randomInt(pool.length)]!);
+    if (!pick) return reply.code(409).send({ error: 'The library changed while picking — try again' });
     return {
-      pick: serializeMedia(pool[crypto.randomInt(pool.length)]!),
+      pick: serializeMedia(pick),
       poolSize: pool.length,
       myMethod: mine.method,
       partnerMethod: theirs.method,

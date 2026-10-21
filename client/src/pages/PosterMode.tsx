@@ -127,6 +127,7 @@ export function PosterMode() {
         <Poster
           mediaId={mediaId}
           title={title}
+          width={1200} // a wall display, often in portrait
           className="rounded-xl shadow-[0_0_80px_rgba(62,203,255,0.15)]"
         />
       </div>
