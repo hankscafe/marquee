@@ -1,5 +1,5 @@
 import * as oidc from 'openid-client';
-import { getSetting } from '../settings.js';
+import { getAppUrl, getSetting } from '../settings.js';
 
 // OIDC (Authentik / Authelia / Keycloak / any compliant provider), configured
 // by the admin. Authorization-code flow with PKCE; discovery is cached until
@@ -37,7 +37,7 @@ export async function getOidcConfiguration(): Promise<oidc.Configuration> {
 }
 
 export function oidcRedirectUri(): string {
-  const appUrl = getSetting('app.url');
+  const appUrl = getAppUrl();
   if (!appUrl) throw new Error('Set the public app URL in Admin settings first (OIDC needs it for the redirect)');
-  return `${appUrl.replace(/\/+$/, '')}/api/auth/oidc/callback`;
+  return `${appUrl}/api/auth/oidc/callback`;
 }

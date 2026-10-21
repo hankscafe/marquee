@@ -4,16 +4,15 @@ import { eq, sql } from 'drizzle-orm';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
 import { getOidcConfiguration, getOidcSettings, oidcRedirectUri } from './oidc.js';
-import { config } from '../config.js';
 import { encryptSecret } from '../crypto.js';
 import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { authenticateJf, getJfConfig } from '../jellyfin/client.js';
 import { logger } from '../logger.js';
-import { buildAuthUrl, checkLoginPin, createLoginPin, getPlexAccount, hasServerAccess } from '../plex/plextv.js';
-import { getPlexConfig, getSetting } from '../settings.js';
+import { buildAuthUrl, checkLoginPin, createLoginPin, getPlexAccount, getServerAccessToken } from '../plex/plextv.js';
+import { getAppUrl, getPlexConfig, getSetting } from '../settings.js';
 import { hashPassword, verifyPassword } from './passwords.js';
-import { createSession, destroySession } from './plugin.js';
+import { createSession, destroySession, idleMinutes } from './plugin.js';
 import { uniqueUsername, usernameIs, usernameTaken } from './usernames.js';
 
 const credentialsSchema = z.object({
@@ -45,11 +44,7 @@ export async function authRoutes(app: FastifyInstance) {
     return {
       needsSetup: userCount() === 0,
       user: request.user,
-      idleTimeoutMinutes: request.user
-        ? request.user.isAdmin
-          ? config.adminIdleMinutes
-          : config.userIdleMinutes
-        : null,
+      idleTimeoutMinutes: request.user ? idleMinutes(request.user.isAdmin) : null,
       authMethods: {
         plex: !!getPlexConfig(),
         jellyfin: !!getJfConfig('jellyfin'),
@@ -238,7 +233,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (userCount() === 0) return reply.code(400).send({ error: 'Complete first-run setup before signing in with Plex' });
     try {
       const pin = await createLoginPin();
-      const origin = getSetting('app.url')?.replace(/\/+$/, '') ?? `${request.protocol}://${request.headers.host}`;
+      const origin = getAppUrl() ?? `${request.protocol}://${request.headers.host}`;
       reply.setCookie(PLEX_PIN_COOKIE, String(pin.id), {
         path: '/api/auth/plex',
         httpOnly: true,
@@ -287,7 +282,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
     let allowed;
     try {
-      allowed = await hasServerAccess(cfg, token);
+      allowed = (await getServerAccessToken(cfg, token)) !== null;
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not reach plex.tv' });
     }
@@ -303,15 +298,12 @@ export async function authRoutes(app: FastifyInstance) {
 }
 
 // Find-or-create the Marquee account for a plex.tv identity (regular or managed).
-function upsertPlexUser(
-  account: { id: number; username: string; thumb: string | null },
-  token: string,
-): typeof users.$inferSelect {
+function upsertPlexUser(account: { id: number; username: string }, token: string): typeof users.$inferSelect {
   const plexId = String(account.id);
   const storedToken = encryptSecret(token);
   const existing = db.select().from(users).where(eq(users.plexId, plexId)).get();
   if (existing) {
-    db.update(users).set({ plexToken: storedToken, avatar: account.thumb }).where(eq(users.id, existing.id)).run();
+    db.update(users).set({ plexToken: storedToken }).where(eq(users.id, existing.id)).run();
     logger.info({ userId: existing.id }, 'plex sign-in');
     return existing;
   }
@@ -319,7 +311,7 @@ function upsertPlexUser(
   const username = uniqueUsername(account.username);
   const created = db
     .insert(users)
-    .values({ username, passwordHash: null, plexId, plexToken: storedToken, avatar: account.thumb })
+    .values({ username, passwordHash: null, plexId, plexToken: storedToken })
     .returning()
     .get();
   logger.info({ userId: created.id, username }, 'new user created via plex sign-in');

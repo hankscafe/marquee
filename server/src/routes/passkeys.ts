@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { db } from '../db/index.js';
 import { passkeys, users } from '../db/schema.js';
 import { createSession, requireUser } from '../auth/plugin.js';
-import { getSetting } from '../settings.js';
+import { getAppUrl } from '../settings.js';
 
 // WebAuthn passkeys: any signed-in user can register one from the Account page;
 // the login page then offers usernameless (discoverable-credential) sign-in.
@@ -23,8 +23,7 @@ const CHALLENGE_COOKIE = 'marquee_webauthn';
 // The relying-party id/origin must match what the browser sees. Prefer the
 // admin-configured public URL; fall back to the request's own host (dev).
 function rpContext(request: FastifyRequest): { origin: string; rpID: string } {
-  const appUrl = getSetting('app.url');
-  const origin = appUrl ? appUrl.replace(/\/+$/, '') : `${request.protocol}://${request.headers.host}`;
+  const origin = getAppUrl() ?? `${request.protocol}://${request.headers.host}`;
   return { origin, rpID: new URL(origin).hostname };
 }
 

@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { media, pollOptions, polls, users, votes } from '../db/schema.js';
 import { notifyPollClosed } from '../discord/bot.js';
 import { emitPollUpdate } from '../events.js';
+import { getOptionCounts } from './votes.js';
 
 export const MAX_POLL_OPTIONS = 50;
 
@@ -22,19 +23,9 @@ export function pollableMedia(ids: number[]): (typeof media.$inferSelect)[] {
   return unique.map((id) => found.get(id)).filter((m): m is typeof media.$inferSelect => !!m);
 }
 
-// An option snapshots the title (with year) and poster at the time it's added.
+// An option snapshots the title (with year) at the time it's added; its poster comes from the media row.
 export function optionFromMedia(pollId: number, m: typeof media.$inferSelect): typeof pollOptions.$inferInsert {
-  return { pollId, mediaId: m.id, title: m.year ? `${m.title} (${m.year})` : m.title, thumb: m.thumb };
-}
-
-export function getOptionCounts(pollId: number): Map<number, number> {
-  const rows = db
-    .select({ optionId: votes.optionId, count: sql<number>`count(*)` })
-    .from(votes)
-    .where(eq(votes.pollId, pollId))
-    .groupBy(votes.optionId)
-    .all();
-  return new Map(rows.map((r) => [r.optionId, r.count]));
+  return { pollId, mediaId: m.id, title: m.year ? `${m.title} (${m.year})` : m.title };
 }
 
 export function closePoll(pollId: number) {
@@ -113,7 +104,6 @@ export function serializePollDetail(poll: typeof polls.$inferSelect, viewer: { i
     description: poll.description,
     status: poll.status,
     shareToken: poll.shareToken,
-    opensAt: poll.opensAt,
     closesAt: poll.closesAt,
     winnerOptionId: poll.winnerOptionId,
     discordPosted: !!poll.discordMessageId,

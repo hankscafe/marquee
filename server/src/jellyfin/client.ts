@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { getSetting, setSetting } from '../settings.js';
 import { mapLimit } from '../sources/mapLimit.js';
 import type { NormalizedCollection, NormalizedItem, SourceSyncData } from '../sources/types.js';
+import { serverUrl } from '../urls.js';
 
 // Jellyfin and Emby share (essentially) one API — Jellyfin forked from Emby —
 // so a single client covers both, parameterized by kind. Auth is an API key
@@ -15,10 +16,6 @@ export function getJfConfig(kind: JfKind): { url: string; apiKey: string } | nul
   return url && apiKey ? { url, apiKey } : null;
 }
 
-function base(url: string): string {
-  return url.replace(/\/+$/, '');
-}
-
 // Without these, a stalled server holds each request for undici's 300 s header
 // and body timeouts, all while a sync holds its "already running" guard. A
 // whole-library listing is one large response, so it gets longer.
@@ -28,7 +25,7 @@ const ARTWORK_TIMEOUT_MS = 15_000;
 const COLLECTION_CONCURRENCY = 8;
 
 async function jfGet<T>(cfg: { url: string; apiKey: string }, path: string, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
-  const res = await fetch(`${base(cfg.url)}${path}`, {
+  const res = await fetch(serverUrl(cfg.url, path), {
     headers: { 'X-Emby-Token': cfg.apiKey, Accept: 'application/json' },
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -200,7 +197,7 @@ export async function fetchJfSessions(kind: JfKind): Promise<JfSessionInfo[]> {
 export async function fetchJfArtwork(kind: JfKind, itemId: string): Promise<Response> {
   const cfg = getJfConfig(kind);
   if (!cfg) throw new Error(`${kind} is not configured`);
-  return fetch(`${base(cfg.url)}/Items/${encodeURIComponent(itemId)}/Images/Primary?maxWidth=600`, {
+  return fetch(serverUrl(cfg.url, `Items/${encodeURIComponent(itemId)}/Images/Primary?maxWidth=600`), {
     headers: { 'X-Emby-Token': cfg.apiKey },
     signal: AbortSignal.timeout(ARTWORK_TIMEOUT_MS),
   });
@@ -224,7 +221,7 @@ export async function authenticateJf(
 ): Promise<{ id: string; name: string }> {
   const cfg = getJfConfig(kind);
   if (!cfg) throw new Error(`${kind} sign-in is not enabled on this server`);
-  const res = await fetch(`${base(cfg.url)}/Users/AuthenticateByName`, {
+  const res = await fetch(serverUrl(cfg.url, 'Users/AuthenticateByName'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

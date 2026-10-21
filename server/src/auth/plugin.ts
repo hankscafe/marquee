@@ -24,9 +24,9 @@ const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days (absolute cap)
 // take a DB write on every single request.
 const LAST_SEEN_THROTTLE_MS = 60 * 1000;
 
-// Idle window for a session, in ms, based on the account's role.
-export function idleLimitMs(isAdmin: boolean): number {
-  return (isAdmin ? config.adminIdleMinutes : config.userIdleMinutes) * 60 * 1000;
+// Idle window for a session, in minutes, based on the account's role.
+export function idleMinutes(isAdmin: boolean): number {
+  return isAdmin ? config.adminIdleMinutes : config.userIdleMinutes;
 }
 
 export async function createSession(reply: FastifyReply, userId: number) {
@@ -82,7 +82,7 @@ export const authPlugin = fp(async (app: FastifyInstance) => {
     // Idle auto-logout: if the session has gone untouched longer than the
     // role's window, revoke it and clear the cookie instead of authenticating.
     const lastSeen = row.lastSeenAt ?? now;
-    if (now.getTime() - lastSeen.getTime() > idleLimitMs(row.isAdmin)) {
+    if (now.getTime() - lastSeen.getTime() > idleMinutes(row.isAdmin) * 60_000) {
       db.delete(sessions).where(eq(sessions.token, token)).run();
       reply.clearCookie(COOKIE_NAME, { path: '/' });
       return;

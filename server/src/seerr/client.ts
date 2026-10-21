@@ -1,4 +1,5 @@
 import { getSetting } from '../settings.js';
+import { serverUrl } from '../urls.js';
 
 // Request-service integration. Overseerr and Jellyseerr share one API; Ombi has its own.
 
@@ -15,13 +16,8 @@ export function getSeerrConfig(): SeerrConfig | null {
   return url && apiKey ? { url, apiKey, kind } : null;
 }
 
-function base(url: string): string {
-  return url.replace(/\/+$/, '');
-}
-
 export async function testSeerr(cfg: SeerrConfig): Promise<void> {
-  const target =
-    cfg.kind === 'ombi' ? `${base(cfg.url)}/api/v1/Status` : `${base(cfg.url)}/api/v1/settings/main`;
+  const target = serverUrl(cfg.url, cfg.kind === 'ombi' ? 'api/v1/Status' : 'api/v1/settings/main');
   const res = await fetch(target, { headers: { 'X-Api-Key': cfg.apiKey, Accept: 'application/json' } });
   if (!res.ok) throw new Error(`${cfg.kind} responded ${res.status} — check the URL and API key`);
 }
@@ -53,7 +49,7 @@ async function seerrUsers(cfg: SeerrConfig): Promise<SeerrUser[]> {
   if (userCache && Date.now() - userCache.at < USER_CACHE_MS) return userCache.users;
   const users: SeerrUser[] = [];
   for (let skip = 0; ; skip += 100) {
-    const res = await fetch(`${base(cfg.url)}/api/v1/user?take=100&skip=${skip}`, {
+    const res = await fetch(serverUrl(cfg.url, `api/v1/user?take=100&skip=${skip}`), {
       headers: { 'X-Api-Key': cfg.apiKey, Accept: 'application/json' },
       signal: AbortSignal.timeout(15_000),
     });
@@ -113,7 +109,7 @@ export async function canRequest(who: Requester): Promise<boolean> {
 }
 
 export async function requestMovie(cfg: SeerrConfig, tmdbId: number, asSeerrUser: number | null): Promise<void> {
-  const target = cfg.kind === 'ombi' ? `${base(cfg.url)}/api/v1/Request/movie` : `${base(cfg.url)}/api/v1/request`;
+  const target = serverUrl(cfg.url, cfg.kind === 'ombi' ? 'api/v1/Request/movie' : 'api/v1/request');
   const body = cfg.kind === 'ombi' ? { theMovieDbId: tmdbId } : { mediaType: 'movie', mediaId: tmdbId };
   const res = await fetch(target, {
     method: 'POST',

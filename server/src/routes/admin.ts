@@ -12,7 +12,7 @@ import { startDiscordBot, testDiscord } from '../discord/bot.js';
 import { testJf } from '../jellyfin/client.js';
 import { getSections } from '../plex/client.js';
 import { clearSeerrUserCache, getSeerrConfig, testSeerr } from '../seerr/client.js';
-import { getPlexConfig, getSetting, setSetting } from '../settings.js';
+import { getAppUrl, getPlexConfig, getSetting, setSetting } from '../settings.js';
 import { isSyncRunning, runLibrarySync } from '../sources/index.js';
 import { syncStatus } from '../sources/syncSchedule.js';
 import { getScanState, startFranchiseScan } from '../tmdb/scan.js';
@@ -75,9 +75,7 @@ export async function adminRoutes(app: FastifyInstance) {
     oidcClientId: getSetting('oidc.clientId'),
     oidcSecretSet: !!getSetting('oidc.clientSecret'),
     oidcLabel: getSetting('oidc.label'),
-    oidcRedirectUri: getSetting('app.url')
-      ? `${getSetting('app.url')!.replace(/\/+$/, '')}/api/auth/oidc/callback`
-      : null,
+    oidcRedirectUri: getAppUrl() ? `${getAppUrl()}/api/auth/oidc/callback` : null,
     seerrUrl: getSetting('seerr.url'),
     seerrKind: getSetting('seerr.kind') === 'ombi' ? ('ombi' as const) : ('overseerr' as const),
     seerrKeySet: !!getSetting('seerr.apiKey'),

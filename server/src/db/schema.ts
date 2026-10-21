@@ -16,7 +16,6 @@ export const users = sqliteTable(
     oidcSub: text('oidc_sub').unique(), // set for OIDC-authenticated accounts (subject claim)
     traktToken: text('trakt_token'), // Trakt OAuth access token, set when the user connects Trakt
     traktRefresh: text('trakt_refresh'),
-    avatar: text('avatar'),
     isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' })
       .notNull()
@@ -168,7 +167,6 @@ export const pollOptions = sqliteTable(
       .references(() => polls.id, { onDelete: 'cascade' }),
     mediaId: integer('media_id').references(() => media.id),
     title: text('title').notNull(),
-    thumb: text('thumb'),
   },
   // Every poll view and the poll list load options by poll.
   (t) => [index('poll_options_poll_id_idx').on(t.pollId)],

@@ -3,19 +3,13 @@ import type { FastifyInstance } from 'fastify';
 import { and, desc, eq, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { pollOptions, polls, votes } from '../db/schema.js';
+import { pollOptions, polls } from '../db/schema.js';
 import { requireUser } from '../auth/plugin.js';
 import { DISCORD_MAX_OPTIONS, postPollToDiscord, updatePollMessage } from '../discord/bot.js';
 import { emitPollUpdate, streamPollEvents } from '../events.js';
 import { pruneGuestsWithoutVotes } from '../polls/guests.js';
-import {
-  closePoll,
-  getOptionCounts,
-  MAX_POLL_OPTIONS,
-  optionFromMedia,
-  pollableMedia,
-  serializePollDetail,
-} from '../polls/service.js';
+import { closePoll, MAX_POLL_OPTIONS, optionFromMedia, pollableMedia, serializePollDetail } from '../polls/service.js';
+import { castVote, getOptionCounts } from '../polls/votes.js';
 
 // Posting to Discord speaks as the bot in a shared channel, so keep it slow.
 const DISCORD_POST_RATE = { rateLimit: { max: 10, timeWindow: '1 minute' } };
@@ -210,14 +204,8 @@ export async function pollRoutes(app: FastifyInstance) {
       .get();
     if (!option) return reply.code(400).send({ error: 'That option does not belong to this poll' });
 
-    try {
-      db.insert(votes).values({ pollId: poll.id, optionId: option.id, userId: request.user!.id }).run();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes('UNIQUE')) {
-        return reply.code(409).send({ error: 'You have already voted in this poll' });
-      }
-      throw err;
+    if (!castVote({ pollId: poll.id, optionId: option.id, userId: request.user!.id })) {
+      return reply.code(409).send({ error: 'You have already voted in this poll' });
     }
 
     emitPollUpdate(token);

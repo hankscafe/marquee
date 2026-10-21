@@ -3,6 +3,7 @@ import { decryptSecret, encryptSecret, isEncrypted } from './crypto.js';
 import { db } from './db/index.js';
 import { settings, users } from './db/schema.js';
 import { logger } from './logger.js';
+import { trimTrailingSlashes } from './urls.js';
 
 // Settings whose values are secrets — encrypted at rest, decrypted on read.
 const SECRET_KEYS = new Set([
@@ -53,6 +54,12 @@ export function migrateSecretsAtRest() {
     }
   }
   if (migrated > 0) logger.info({ migrated }, 'encrypted legacy plaintext secrets at rest');
+}
+
+// The public URL people reach Marquee at (set in Admin), without a trailing slash.
+export function getAppUrl(): string | null {
+  const url = getSetting('app.url');
+  return url ? trimTrailingSlashes(url) : null;
 }
 
 export function getPlexConfig(): { url: string; token: string } | null {

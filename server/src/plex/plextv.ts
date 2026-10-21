@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { getSetting, setSetting } from '../settings.js';
+import { serverUrl } from '../urls.js';
 import { getMachineIdentifier } from './client.js';
 
 // plex.tv PIN-based OAuth ("Sign in with Plex"), the same flow Overseerr uses:
@@ -55,15 +56,13 @@ export async function checkLoginPin(id: number): Promise<string | null> {
   return json.authToken || null;
 }
 
-export async function getPlexAccount(
-  token: string,
-): Promise<{ id: number; username: string; thumb: string | null }> {
+export async function getPlexAccount(token: string): Promise<{ id: number; username: string }> {
   const res = await fetch(`${PLEX_TV}/api/v2/user`, {
     headers: { ...plexTvHeaders(), 'X-Plex-Token': token },
   });
   if (!res.ok) throw new Error(`plex.tv account lookup failed (${res.status})`);
-  const json = (await res.json()) as { id: number; username?: string; title?: string; thumb?: string };
-  return { id: json.id, username: json.username || json.title || `plex-${json.id}`, thumb: json.thumb ?? null };
+  const json = (await res.json()) as { id: number; username?: string; title?: string };
+  return { id: json.id, username: json.username || json.title || `plex-${json.id}` };
 }
 
 // Plex Home ("managed users"): listed for the admin user-import only.
@@ -123,31 +122,25 @@ async function findServerResource(
   );
 }
 
-// This account's per-server token, once the configured server itself has
-// accepted it — or null. plex.tv's list belongs to the account signing in, and
-// a server's identifier isn't secret, so a look-alike server registered under
-// the same identifier could appear in it. Only the real server accepts tokens
-// for itself. Unreachable server → throws, so sign-in fails closed.
-async function verifiedServerToken(server: { url: string; token: string }, userToken: string): Promise<string | null> {
-  const accessToken = (await findServerResource(server, userToken))?.accessToken;
-  if (!accessToken) return null;
-  const url = new URL('library/sections', server.url.endsWith('/') ? server.url : `${server.url}/`);
-  const res = await fetch(url, { headers: { 'X-Plex-Token': accessToken, Accept: 'application/json' } });
-  if (res.ok) return accessToken;
-  if (res.status === 401 || res.status === 403) return null;
-  throw new Error(`Plex server access check failed (${res.status})`);
-}
-
-// Gate: only the owner and accounts the server is shared with may sign in.
-export async function hasServerAccess(server: { url: string; token: string }, userToken: string): Promise<boolean> {
-  return (await verifiedServerToken(server, userToken)) !== null;
-}
-
-// The token to query the server as this account (so UserData is theirs): the
-// owner's own token, or the per-server token plex.tv issued a shared user.
+// The token to query the configured server as this account (so UserData is
+// theirs) — the owner's own token, or the per-server token plex.tv issued a
+// shared user — or null when the server isn't shared with them. Sign-in uses it
+// as the gate: only the owner and accounts the server is shared with get in.
+// The token counts only once the configured server itself has accepted it:
+// plex.tv's list belongs to the account signing in, and a server's identifier
+// isn't secret, so a look-alike server registered under the same identifier
+// could appear in it. Only the real server accepts tokens for itself.
+// Unreachable server → throws, so sign-in fails closed.
 export async function getServerAccessToken(
   server: { url: string; token: string },
   userToken: string,
 ): Promise<string | null> {
-  return verifiedServerToken(server, userToken);
+  const accessToken = (await findServerResource(server, userToken))?.accessToken;
+  if (!accessToken) return null;
+  const res = await fetch(serverUrl(server.url, 'library/sections'), {
+    headers: { 'X-Plex-Token': accessToken, Accept: 'application/json' },
+  });
+  if (res.ok) return accessToken;
+  if (res.status === 401 || res.status === 403) return null;
+  throw new Error(`Plex server access check failed (${res.status})`);
 }

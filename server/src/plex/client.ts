@@ -1,3 +1,5 @@
+import { serverUrl } from '../urls.js';
+
 export interface PlexSection {
   key: string;
   title: string;
@@ -25,14 +27,16 @@ export interface PlexItem {
   guid?: string; // legacy agents carry their one id here, e.g. com.plexapp.agents.imdb://tt0087469?lang=en
 }
 
+// Shows count as watched when every episode has been viewed; movies when viewed at least once.
+export function isWatchedOnPlex(item: PlexItem): boolean {
+  return item.type === 'show'
+    ? (item.leafCount ?? 0) > 0 && (item.viewedLeafCount ?? 0) >= (item.leafCount ?? 0)
+    : (item.viewCount ?? 0) > 0;
+}
+
 export interface PlexCollection {
   ratingKey: string;
   title: string;
-}
-
-// Plex paths are passed relative (no leading slash) so a base URL with a path prefix still works.
-function plexUrl(baseUrl: string, pathname: string): URL {
-  return new URL(pathname, baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`);
 }
 
 // Without these, a stalled server holds each request for undici's 300 s header
@@ -44,7 +48,7 @@ const LIBRARY_TIMEOUT_MS = 5 * 60_000;
 const ARTWORK_TIMEOUT_MS = 15_000;
 
 async function plexGet<T>(baseUrl: string, token: string, pathname: string, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
-  const res = await fetch(plexUrl(baseUrl, pathname), {
+  const res = await fetch(serverUrl(baseUrl, pathname), {
     headers: { 'X-Plex-Token': token, Accept: 'application/json' },
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -120,7 +124,7 @@ export interface PlexSession {
 
 // Short timeout: this feeds the poster display's poll loop, which must stay snappy.
 export async function getSessions(baseUrl: string, token: string): Promise<PlexSession[]> {
-  const res = await fetch(plexUrl(baseUrl, 'status/sessions'), {
+  const res = await fetch(serverUrl(baseUrl, 'status/sessions'), {
     headers: { 'X-Plex-Token': token, Accept: 'application/json' },
     signal: AbortSignal.timeout(5000),
   });
@@ -131,11 +135,10 @@ export async function getSessions(baseUrl: string, token: string): Promise<PlexS
 
 // Streams artwork through the server so the Plex token never reaches the browser.
 export async function fetchArtwork(baseUrl: string, token: string, thumbPath: string): Promise<Response> {
-  const base = new URL(baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`);
-  const url = new URL(thumbPath.replace(/^\/+/, ''), base);
+  const url = serverUrl(baseUrl, thumbPath);
   // `thumb` is synced from the media server, but pin the host anyway: an absolute
   // path would otherwise let new URL() redirect the token-bearing request off-box.
-  if (url.origin !== base.origin) throw new Error('refusing to fetch artwork from an unexpected host');
+  if (url.origin !== new URL(baseUrl).origin) throw new Error('refusing to fetch artwork from an unexpected host');
   url.searchParams.set('X-Plex-Token', token);
   return fetch(url, { signal: AbortSignal.timeout(ARTWORK_TIMEOUT_MS) });
 }

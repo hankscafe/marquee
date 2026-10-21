@@ -7,6 +7,7 @@ import {
   getSectionCollections,
   getSectionItems,
   getSections,
+  isWatchedOnPlex,
   type PlexItem,
 } from './client.js';
 
@@ -23,11 +24,6 @@ function normalizeItem(item: PlexItem, sectionTitle: string): NormalizedItem {
     imdbId = /agents\.imdb:\/\/(tt\d+)/.exec(item.guid)?.[1] ?? null;
     tmdbId = /agents\.themoviedb:\/\/(\d+)/.exec(item.guid)?.[1] ?? null;
   }
-  // Shows count as watched when every episode has been viewed; movies when viewed at least once.
-  const watched =
-    item.type === 'show'
-      ? (item.leafCount ?? 0) > 0 && (item.viewedLeafCount ?? 0) >= (item.leafCount ?? 0)
-      : (item.viewCount ?? 0) > 0;
   return {
     ratingKey: item.ratingKey,
     title: item.title,
@@ -44,7 +40,7 @@ function normalizeItem(item: PlexItem, sectionTitle: string): NormalizedItem {
     contentRating: item.contentRating ?? null,
     directors: tags(item.Director),
     actors: tags(item.Role),
-    watched,
+    watched: isWatchedOnPlex(item),
   };
 }
 

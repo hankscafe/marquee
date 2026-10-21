@@ -10,6 +10,7 @@ import { fetchArtwork } from '../plex/client.js';
 import { pickRandomMedia } from '../randomizer/service.js';
 import { getPlexConfig, getSetting } from '../settings.js';
 import { dedupeMedia } from '../sources/dedupe.js';
+import { serverUrl } from '../urls.js';
 
 const RESULTS_PER_PAGE = 60;
 
@@ -37,7 +38,7 @@ function buildWatchUrl(row: typeof media.$inferSelect): string | null {
   if (!url) return null;
   const serverId = getSetting(`${row.source}.serverId`) ?? '';
   const path = row.source === 'jellyfin' ? 'details' : 'item';
-  return `${url.replace(/\/+$/, '')}/web/index.html#!/${path}?id=${row.ratingKey}&serverId=${serverId}`;
+  return serverUrl(url, `web/index.html#!/${path}?id=${row.ratingKey}&serverId=${serverId}`).href;
 }
 
 // Tag lists are stored as JSON strings; parse before sending to clients.

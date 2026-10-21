@@ -133,7 +133,6 @@ export interface PollDetail {
   description: string | null;
   status: PollStatus;
   shareToken: string;
-  opensAt: string | null;
   closesAt: string | null;
   winnerOptionId: number | null;
   discordPosted: boolean;

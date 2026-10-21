@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { decryptSecret } from '../crypto.js';
 import { db } from '../db/index.js';
 import { media, users } from '../db/schema.js';
-import { getSectionItems, getSections } from '../plex/client.js';
+import { getSectionItems, getSections, isWatchedOnPlex } from '../plex/client.js';
 import { getServerAccessToken } from '../plex/plextv.js';
 import { getPlexConfig } from '../settings.js';
 import { getWatchedSet } from '../trakt/service.js';
@@ -41,11 +41,7 @@ async function plexWatchedSet(userId: number, plexToken: string): Promise<Set<nu
     for (const section of sections) {
       const items = await getSectionItems(cfg.url, serverToken, section.key);
       for (const item of items) {
-        const watched =
-          item.type === 'show'
-            ? (item.leafCount ?? 0) > 0 && (item.viewedLeafCount ?? 0) >= (item.leafCount ?? 0)
-            : (item.viewCount ?? 0) > 0;
-        if (!watched) continue;
+        if (!isWatchedOnPlex(item)) continue;
         const id = byKey.get(item.ratingKey);
         if (id) set.add(id);
       }

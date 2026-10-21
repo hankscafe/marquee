@@ -9,13 +9,14 @@ import {
   MessageFlags,
   type Interaction,
 } from 'discord.js';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { uniqueUsername } from '../auth/usernames.js';
 import { db } from '../db/index.js';
-import { pollOptions, polls, users, votes } from '../db/schema.js';
+import { pollOptions, polls, users } from '../db/schema.js';
 import { emitPollUpdate } from '../events.js';
 import { logger } from '../logger.js';
-import { getSetting } from '../settings.js';
+import { castVote, getOptionCounts } from '../polls/votes.js';
+import { getAppUrl, getSetting } from '../settings.js';
 
 // Discord integration: post a poll as an embed with one button per option,
 // record button votes as shadow Marquee accounts (keyed to the Discord user id,
@@ -73,21 +74,11 @@ export async function startDiscordBot(): Promise<void> {
   }
 }
 
-function optionCounts(pollId: number): Map<number, number> {
-  const rows = db
-    .select({ optionId: votes.optionId, count: sql<number>`count(*)` })
-    .from(votes)
-    .where(eq(votes.pollId, pollId))
-    .groupBy(votes.optionId)
-    .all();
-  return new Map(rows.map((r) => [r.optionId, r.count]));
-}
-
 type PollRow = typeof polls.$inferSelect;
 type OptionRow = typeof pollOptions.$inferSelect;
 
 function pollEmbed(poll: PollRow, options: OptionRow[], final: boolean): EmbedBuilder {
-  const counts = optionCounts(poll.id);
+  const counts = getOptionCounts(poll.id);
   const total = [...counts.values()].reduce((a, b) => a + b, 0);
   const lines = options.map((o, i) => {
     const n = counts.get(o.id) ?? 0;
@@ -103,8 +94,8 @@ function pollEmbed(poll: PollRow, options: OptionRow[], final: boolean): EmbedBu
         ? `Voting closed · ${total} vote${total === 1 ? '' : 's'} · Marquee`
         : `${total} vote${total === 1 ? '' : 's'} so far · one vote per person · Marquee`,
     });
-  const appUrl = getSetting('app.url');
-  if (appUrl) embed.setURL(`${appUrl.replace(/\/+$/, '')}/p/${poll.shareToken}`);
+  const appUrl = getAppUrl();
+  if (appUrl) embed.setURL(`${appUrl}/p/${poll.shareToken}`);
   return embed;
 }
 
@@ -197,7 +188,7 @@ export async function notifyPollClosed(pollId: number): Promise<void> {
     await message.edit({ embeds: [pollEmbed(poll, options, true)], components: [] });
     const winner = options.find((o) => o.id === poll.winnerOptionId);
     if (winner && message.channel.isSendable()) {
-      const n = optionCounts(poll.id).get(winner.id) ?? 0;
+      const n = getOptionCounts(poll.id).get(winner.id) ?? 0;
       await message.channel.send(
         `🏆 **${poll.title}** — tonight's feature is **${winner.title}** with ${n} vote${n === 1 ? '' : 's'}!`,
       );
@@ -277,15 +268,9 @@ async function handleInteraction(interaction: Interaction): Promise<void> {
       .get();
   }
 
-  try {
-    db.insert(votes).values({ pollId: poll.id, optionId: option.id, userId: user.id }).run();
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (message.includes('UNIQUE')) {
-      await interaction.reply({ content: 'You already voted in this poll!', flags: MessageFlags.Ephemeral });
-      return;
-    }
-    throw err;
+  if (!castVote({ pollId: poll.id, optionId: option.id, userId: user.id })) {
+    await interaction.reply({ content: 'You already voted in this poll!', flags: MessageFlags.Ephemeral });
+    return;
   }
 
   emitPollUpdate(poll.shareToken);

@@ -1,11 +1,11 @@
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { desc, eq, ne } from 'drizzle-orm';
-import type { WidgetPoll } from '@marquee/shared';
+import type { WidgetPoll, WidgetPollsResponse } from '@marquee/shared';
 import { db } from '../db/index.js';
 import { pollOptions, polls } from '../db/schema.js';
-import { getOptionCounts } from '../polls/service.js';
-import { getSetting } from '../settings.js';
+import { getOptionCounts } from '../polls/votes.js';
+import { getAppUrl, getSetting } from '../settings.js';
 
 // Constant-time key comparison so a wrong key can't be timed out character by character.
 function keysMatch(provided: string, expected: string): boolean {
@@ -61,7 +61,7 @@ export async function widgetRoutes(app: FastifyInstance) {
       return reply.code(401).send({ error: 'Invalid or missing API key' });
     }
 
-    const appUrl = getSetting('app.url')?.replace(/\/+$/, '') ?? null;
+    const appUrl = getAppUrl();
     const query = request.query as { spotlight?: string; only?: string };
     const spotlightOnly = query.spotlight === '1' || query.spotlight === 'true' || query.only === 'spotlight';
 
@@ -69,7 +69,7 @@ export async function widgetRoutes(app: FastifyInstance) {
     const spotlight = spotRow ? serializeWidgetPoll(spotRow, appUrl) : null;
 
     if (spotlightOnly) {
-      return { generatedAt: new Date().toISOString(), spotlight };
+      return { generatedAt: new Date().toISOString(), spotlight } satisfies WidgetPollsResponse;
     }
 
     // All non-draft polls, open ones first, newest within each group; the
@@ -89,6 +89,6 @@ export async function widgetRoutes(app: FastifyInstance) {
       generatedAt: new Date().toISOString(),
       spotlight,
       polls: ordered.map((p) => serializeWidgetPoll(p, appUrl)),
-    };
+    } satisfies WidgetPollsResponse;
   });
 }

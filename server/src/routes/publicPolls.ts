@@ -9,6 +9,7 @@ import { updatePollMessage } from '../discord/bot.js';
 import { emitPollUpdate, streamPollEvents } from '../events.js';
 import { serializePollDetail, serializePublicPoll } from '../polls/service.js';
 import { GUEST_VOTES_PER_NETWORK, guestUsername, networkFingerprint } from '../polls/guests.js';
+import { castVote } from '../polls/votes.js';
 import { streamPoster } from './media.js';
 
 // Public poll links: an admin can share a poll at /vote/<publicToken> so people
@@ -150,12 +151,8 @@ export async function publicPollRoutes(app: FastifyInstance) {
       userId = guestAccountId(request, reply);
     }
 
-    try {
-      db.insert(votes).values({ pollId: poll.id, optionId: option.id, userId, voterName, voterNetwork }).run();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes('UNIQUE')) return reply.code(409).send({ error: 'You have already voted in this poll' });
-      throw err;
+    if (!castVote({ pollId: poll.id, optionId: option.id, userId, voterName, voterNetwork })) {
+      return reply.code(409).send({ error: 'You have already voted in this poll' });
     }
 
     emitPollUpdate(poll.shareToken);

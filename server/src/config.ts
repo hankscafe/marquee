@@ -70,8 +70,6 @@ export const config = {
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   adminIdleMinutes: idleMinutes('ADMIN_IDLE_MINUTES', 120), // 2 hours
   userIdleMinutes: idleMinutes('USER_IDLE_MINUTES', 360), // 6 hours
-  dataDir,
   databasePath: process.env.DATABASE_PATH ?? path.join(dataDir, 'marquee.db'),
   sessionSecret: loadSessionSecret(),
-  isProd: process.env.NODE_ENV === 'production',
 };
