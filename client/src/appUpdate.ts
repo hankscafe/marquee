@@ -13,7 +13,25 @@ const listeners = new Set<(ready: boolean) => void>();
 
 const isPosterMode = () => window.location.pathname.startsWith('/poster');
 
+// A tab still running an old release may ask for a page that loads on first
+// use (Admin, Collections…) after the server moved to a new one, whose files
+// have new names. Reloading picks up the new release. Once a minute at most,
+// so a dropped connection can't put the page in a reload loop.
+const RELOAD_KEY = 'marquee:chunk-reload';
+
+function reloadForMissingChunk(event: Event) {
+  try {
+    if (Date.now() - (Number(sessionStorage.getItem(RELOAD_KEY)) || 0) < 60_000) return; // let the error show
+    sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+  } catch {
+    return; // without storage there's no loop guard, so don't reload
+  }
+  event.preventDefault();
+  window.location.reload();
+}
+
 export function startUpdateChecks() {
+  window.addEventListener('vite:preloadError', reloadForMissingChunk);
   activate = registerSW({
     immediate: true,
     onNeedRefresh() {

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { MediaItem, PollDetail } from '@marquee/shared';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { PollDetail } from '@marquee/shared';
 import { api, ApiError } from '../api';
+import { MediaPicker } from './MediaPicker';
 import { Modal } from './Modal';
 import { Poster } from './Poster';
 
@@ -12,18 +13,11 @@ const optionLimit = (poll: PollDetail) => (poll.discordPosted ? 25 : 50);
 // changes save right away; the text fields save with Save (or Done). Anyone
 // viewing the poll sees each change live.
 export function EditPollOptions({ poll, onClose }: { poll: PollDetail; onClose: () => void }) {
-  const [query, setQuery] = useState('');
   const [title, setTitle] = useState(poll.title);
   const [description, setDescription] = useState(poll.description ?? '');
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const token = poll.shareToken;
-
-  // With no search term, show a random sample of the library (same as New poll).
-  const { data: results, refetch } = useQuery({
-    queryKey: ['media', 'poll-edit', query],
-    queryFn: () => api<MediaItem[]>(`/api/media?q=${encodeURIComponent(query)}${query ? '' : '&sort=random'}`),
-  });
 
   const onSuccess = (data: PollDetail) => {
     setError(null);
@@ -153,49 +147,20 @@ export function EditPollOptions({ poll, onClose }: { poll: PollDetail; onClose: 
 
         <section className="border-t border-neon-500/10 pt-5">
           <h3 className="mb-3 text-xs font-semibold tracking-widest text-neon-500 uppercase">Add from your library</h3>
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="input min-w-40 flex-1"
-              placeholder="Search movies & shows…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            {!query && (
-              <button className="btn btn-ghost shrink-0" onClick={() => refetch()} title="Show a different random sample">
-                Shuffle
-              </button>
+          <MediaPicker
+            sample
+            stateOf={(m) => (inPoll.has(m.id) ? 'added' : 'available')}
+            onPick={(m) => add.mutate(m.id)}
+            disabled={full || busy}
+            labels={{ pick: 'Add to poll', added: 'Already in this poll' }}
+            gridClassName="grid-cols-3 sm:grid-cols-5"
+          >
+            {full && (
+              <p className="mt-2 text-xs text-stone-500">
+                This poll has the maximum of {limit} options{poll.discordPosted ? ' for Discord' : ''} — remove one to add another.
+              </p>
             )}
-          </div>
-          {full && (
-            <p className="mt-2 text-xs text-stone-500">
-              This poll has the maximum of {limit} options{poll.discordPosted ? ' for Discord' : ''} — remove one to add another.
-            </p>
-          )}
-          <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
-            {results?.map((m) => {
-              const added = inPoll.has(m.id);
-              return (
-                <button
-                  key={m.id}
-                  disabled={added || full || busy}
-                  onClick={() => add.mutate(m.id)}
-                  className="text-left disabled:cursor-default"
-                  title={added ? 'Already in this poll' : 'Add to poll'}
-                >
-                  <Poster
-                    mediaId={m.id}
-                    title={m.title}
-                    className={`rounded-lg transition-opacity ${added ? 'opacity-40 ring-2 ring-neon-400' : full ? 'opacity-60' : 'hover:opacity-80'}`}
-                  />
-                  <p className="mt-1 truncate text-xs text-stone-300">
-                    {added && '✓ '}
-                    {m.title} {m.year ? `(${m.year})` : ''}
-                  </p>
-                </button>
-              );
-            })}
-            {results && results.length === 0 && <p className="col-span-full text-sm text-stone-400">Nothing found.</p>}
-          </div>
+          </MediaPicker>
         </section>
       </div>
     </Modal>

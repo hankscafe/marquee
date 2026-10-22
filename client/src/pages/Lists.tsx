@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ListDetail, ListSummary, MediaItem } from '@marquee/shared';
+import type { ListDetail, ListSummary } from '@marquee/shared';
 import { api } from '../api';
+import { MediaPicker } from '../components/MediaPicker';
 import { Poster } from '../components/Poster';
 
 export function Lists() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [newName, setNewName] = useState('');
-  const [query, setQuery] = useState('');
   const queryClient = useQueryClient();
 
   const { data: lists } = useQuery({ queryKey: ['lists'], queryFn: () => api<ListSummary[]>('/api/lists') });
@@ -15,11 +15,6 @@ export function Lists() {
     queryKey: ['list', selectedId],
     queryFn: () => api<ListDetail>(`/api/lists/${selectedId}`),
     enabled: selectedId !== null,
-  });
-  const { data: results } = useQuery({
-    queryKey: ['media', query],
-    queryFn: () => api<MediaItem[]>(`/api/media?q=${encodeURIComponent(query)}`),
-    enabled: query.length > 0 && selectedId !== null && !!detail?.isOwner,
   });
 
   const refresh = () => {
@@ -126,26 +121,13 @@ export function Lists() {
           </div>
 
           {detail.isOwner && (
-            <div>
-              <input
-                className="input"
-                placeholder="Search library to add titles…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              {query && (
-                <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6">
-                  {results
-                    ?.filter((m) => !detail.items.some((i) => i.id === m.id))
-                    .map((m) => (
-                      <button key={m.id} className="text-left hover:opacity-80" onClick={() => addItem.mutate(m.id)} title="Add to list">
-                        <Poster mediaId={m.id} title={m.title} className="rounded-lg" />
-                        <p className="mt-1 truncate text-xs text-stone-300">{m.title}</p>
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
+            <MediaPicker
+              key={detail.id} // a fresh search for each list
+              placeholder="Search library to add titles…"
+              stateOf={(m) => (detail.items.some((i) => i.id === m.id) ? 'added' : 'available')}
+              onPick={(m) => addItem.mutate(m.id)}
+              labels={{ pick: 'Add to list', added: 'Already on this list' }}
+            />
           )}
         </div>
       )}

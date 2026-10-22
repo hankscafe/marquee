@@ -30,6 +30,17 @@ export function useLogout() {
   });
 }
 
+// Full-screen logo while the app works out who's signed in or loads a page.
+export function SplashScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <span className="text-xl">
+        <MarqueeLogo />
+      </span>
+    </div>
+  );
+}
+
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { data, isLoading } = useAuth();
   const location = useLocation();
@@ -45,15 +56,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     if (target && target !== location.pathname + location.search) navigate(target, { replace: true });
   }, [signedIn]); // once per sign-in, not on every navigation
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <span className="text-xl">
-          <MarqueeLogo />
-        </span>
-      </div>
-    );
-  }
+  if (isLoading) return <SplashScreen />;
   if (!signedIn) {
     const from = location.pathname + location.search;
     rememberReturnTo(from);

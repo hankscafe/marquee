@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { VersionInfo } from '@marquee/shared';
@@ -170,7 +170,10 @@ export function Layout() {
       {updateReady && <AppUpdateNotice />}
       {version && <UpdateBanner key={version.latest ?? 'none'} version={version} />}
       <main className="mx-auto max-w-5xl px-4 py-6 pb-16">
-        <Outlet />
+        {/* Pages that load on first use keep the header up meanwhile. */}
+        <Suspense fallback={<p className="text-stone-400">Loading…</p>}>
+          <Outlet />
+        </Suspense>
       </main>
       <footer className="mx-auto max-w-5xl px-4 pb-6 text-center text-xs text-stone-600">
         {version && (
