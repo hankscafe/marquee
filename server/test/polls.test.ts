@@ -175,3 +175,13 @@ test('one account can only hold a few live result streams open', async () => {
     controller.abort();
   }
 });
+
+test('a tie goes to the title that reached the top count first, even within one second', async () => {
+  // Heat is listed first, but Alien gets its vote first.
+  const poll = (await admin<PollDetail>('POST', '/api/polls', { title: 'Tie', mediaIds: [byTitle.Heat, byTitle.Alien], openNow: true })).data;
+  const [heat, alien] = poll.options;
+  await admin('POST', `/api/polls/${poll.shareToken}/vote`, { optionId: alien!.id });
+  await member('POST', `/api/polls/${poll.shareToken}/vote`, { optionId: heat!.id });
+  const closed = await admin<PollDetail>('POST', `/api/polls/${poll.shareToken}/close`, {});
+  assert.equal(closed.data.winnerOptionId, alien!.id);
+});

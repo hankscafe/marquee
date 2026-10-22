@@ -28,40 +28,37 @@ export function optionFromMedia(pollId: number, m: typeof media.$inferSelect): t
   return { pollId, mediaId: m.id, title: m.year ? `${m.title} (${m.year})` : m.title };
 }
 
+// The winning option from the votes as they stand: the top vote-getter, or
+// null with no votes.
+export function pickWinner(pollId: number): number | null {
+  const options = db.select().from(pollOptions).where(eq(pollOptions.pollId, pollId)).all();
+  const counts = getOptionCounts(pollId);
+  const max = Math.max(0, ...options.map((o) => counts.get(o.id) ?? 0));
+  if (max === 0) return null;
+  const top = options.filter((o) => (counts.get(o.id) ?? 0) === max);
+  if (top.length === 1) return top[0]!.id;
+  // Tie: the title that reached this vote count first wins — the one whose
+  // deciding (most-recent) vote landed earliest. A late challenger that only
+  // ties at the buzzer can't steal it. Votes are ordered by id, not createdAt:
+  // that column keeps whole seconds, so a burst of votes would look simultaneous.
+  const reachedAt = (optionId: number): number => {
+    const last = db
+      .select({ id: votes.id })
+      .from(votes)
+      .where(and(eq(votes.pollId, pollId), eq(votes.optionId, optionId)))
+      .orderBy(desc(votes.id))
+      .limit(1)
+      .get();
+    return last?.id ?? Number.POSITIVE_INFINITY;
+  };
+  return [...top].sort((a, b) => reachedAt(a.id) - reachedAt(b.id))[0]!.id;
+}
+
 export function closePoll(pollId: number) {
   const poll = db.select().from(polls).where(eq(polls.id, pollId)).get();
   if (!poll || poll.status === 'closed') return poll ?? null;
 
-  const options = db.select().from(pollOptions).where(eq(pollOptions.pollId, pollId)).all();
-  const counts = getOptionCounts(pollId);
-  const max = Math.max(0, ...options.map((o) => counts.get(o.id) ?? 0));
-
-  // Winner is the top vote-getter. No votes → no winner.
-  let winnerOptionId: number | null = null;
-  if (max > 0) {
-    const top = options.filter((o) => (counts.get(o.id) ?? 0) === max);
-    if (top.length === 1) {
-      winnerOptionId = top[0]!.id;
-    } else {
-      // Tie: the title that reached this vote count first wins — the one whose
-      // deciding (most-recent) vote landed earliest. A late challenger that only
-      // ties at the buzzer can't steal it. Falls back to option order on an exact
-      // timestamp tie.
-      const reachedAt = (optionId: number): number => {
-        const last = db
-          .select({ ts: votes.createdAt })
-          .from(votes)
-          .where(and(eq(votes.pollId, pollId), eq(votes.optionId, optionId)))
-          .orderBy(desc(votes.createdAt))
-          .limit(1)
-          .get();
-        return last?.ts?.getTime() ?? Number.POSITIVE_INFINITY;
-      };
-      winnerOptionId = [...top].sort((a, b) => reachedAt(a.id) - reachedAt(b.id))[0]!.id;
-    }
-  }
-
-  db.update(polls).set({ status: 'closed', winnerOptionId }).where(eq(polls.id, pollId)).run();
+  db.update(polls).set({ status: 'closed', winnerOptionId: pickWinner(pollId) }).where(eq(polls.id, pollId)).run();
   emitPollUpdate(poll.shareToken);
   void notifyPollClosed(pollId);
   return db.select().from(polls).where(eq(polls.id, pollId)).get() ?? null;

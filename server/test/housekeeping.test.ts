@@ -103,3 +103,30 @@ test('a TRUST_PROXY that isn’t addresses falls back instead of breaking every 
   assert.equal(parseTrustProxy('10.0.0.1/8/9'), fallback);
   assert.equal(parseTrustProxy(','), fallback);
 });
+
+test('deleting a user recounts closed polls and keeps the lists they shared', async () => {
+  const { member: leaver, id: leaverId } = await signUp(m, 'leaver');
+  const { member: stayer } = await signUp(m, 'stayer');
+  const ids = (await admin<{ id: number; title: string }[]>('GET', '/api/media?q=')).data;
+  const id = (title: string) => ids.find((i) => i.title === title)!.id;
+  const poll = (
+    await admin<{ shareToken: string; options: { id: number }[] }>('POST', '/api/polls', { title: 'Decided', mediaIds: [id('Heat'), id('Arrival')], openNow: true })
+  ).data;
+  const [heat, arrival] = poll.options;
+  await admin('POST', `/api/polls/${poll.shareToken}/vote`, { optionId: heat!.id });
+  await leaver('POST', `/api/polls/${poll.shareToken}/vote`, { optionId: arrival!.id });
+  await stayer('POST', `/api/polls/${poll.shareToken}/vote`, { optionId: arrival!.id });
+  const closed = await admin<{ winnerOptionId: number }>('POST', `/api/polls/${poll.shareToken}/close`, {});
+  assert.equal(closed.data.winnerOptionId, arrival!.id);
+  const shared = (await leaver<{ id: number }>('POST', '/api/lists', { name: 'Shared picks', isShared: true })).data;
+  const secret = (await leaver<{ id: number }>('POST', '/api/lists', { name: 'Guilty pleasures' })).data;
+
+  assert.equal((await admin('DELETE', `/api/admin/users/${leaverId}`)).status, 204);
+  // 1–1 now, and Heat got its vote first.
+  const after = await admin<{ winnerOptionId: number }>('GET', `/api/polls/${poll.shareToken}`);
+  assert.equal(after.data.winnerOptionId, heat!.id);
+  const lists = (await admin<{ id: number; isOwner: boolean }[]>('GET', '/api/lists')).data;
+  assert.equal(lists.find((l) => l.id === shared.id)?.isOwner, true, 'the shared list now belongs to the admin');
+  const left = m.db.$client.prepare('select count(*) as n from lists where id = ?').get(secret.id) as { n: number };
+  assert.equal(left.n, 0, 'a private list goes with its owner');
+});

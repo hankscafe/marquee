@@ -46,7 +46,9 @@ function closeDuePolls(now: Date) {
 // Every minute: open drafts whose opensAt has passed, close open polls whose
 // closesAt has passed, fire any due scheduled randomizer picks, start the
 // automatic library sync when it's due, prune dead sessions hourly and check
-// the database once a day. Each step is isolated so one failing
+// the database once a day. Polls, picks and the library sync fire once their
+// time has passed rather than on an exact minute, so a slow tick that makes
+// croner skip a minute only delays them. Each step is isolated so one failing
 // (e.g. SQLITE_BUSY while a backup holds a lock) doesn't skip the others.
 export function startScheduler() {
   const steps: [string, (now: Date) => void][] = [

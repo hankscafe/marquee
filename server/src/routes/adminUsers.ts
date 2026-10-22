@@ -1,13 +1,14 @@
 import type { FastifyInstance } from 'fastify';
-import { eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { polls, sessions, users, votes } from '../db/schema.js';
+import { lists, polls, sessions, users, votes } from '../db/schema.js';
 import { requireAdmin } from '../auth/plugin.js';
 import { runIntegrityCheck } from '../db/health.js';
 import { hashPassword } from '../auth/passwords.js';
 import { uniqueUsername, usernameTaken } from '../auth/usernames.js';
 import { getFriends, getHomeUsers } from '../plex/plextv.js';
+import { pickWinner } from '../polls/service.js';
 import { getPlexConfig } from '../settings.js';
 
 function serializeUser(u: typeof users.$inferSelect, guestName: string | null = null) {
@@ -111,7 +112,23 @@ export async function adminUserRoutes(app: FastifyInstance) {
     if (pollCount > 0) {
       return reply.code(409).send({ error: `${user.username} created ${pollCount} poll(s) — delete those first` });
     }
-    db.delete(users).where(eq(users.id, id)).run();
+    // Their votes go with them, so a closed poll they voted in could otherwise
+    // keep a winner that no longer leads; and lists are deleted with their
+    // owner, so a shared one that others use passes to the admin instead.
+    const closedPolls = db
+      .selectDistinct({ id: votes.pollId })
+      .from(votes)
+      .innerJoin(polls, eq(votes.pollId, polls.id))
+      .where(and(eq(votes.userId, id), eq(polls.status, 'closed')))
+      .all()
+      .map((p) => p.id);
+    db.transaction((tx) => {
+      tx.update(lists).set({ ownerId: request.user!.id }).where(and(eq(lists.ownerId, id), eq(lists.isShared, true))).run();
+      tx.delete(users).where(eq(users.id, id)).run();
+      for (const pollId of closedPolls) {
+        tx.update(polls).set({ winnerOptionId: pickWinner(pollId) }).where(eq(polls.id, pollId)).run();
+      }
+    });
     return reply.code(204).send();
   });
 

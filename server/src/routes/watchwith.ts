@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { WatchWithSettings } from '@marquee/shared';
-import { and, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, eq, isNull, ne, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { media, users } from '../db/schema.js';
@@ -128,14 +128,15 @@ export async function watchWithRoutes(app: FastifyInstance) {
     const pick = overlap[crypto.randomInt(overlap.length)]!;
 
     // If the pick is in the library (and still on the server), return the full
-    // local record; otherwise it's offered as a request.
+    // local record; otherwise it's offered as a request. The type has to match
+    // too: TMDb numbers movies and shows separately (see sources/dedupe.ts).
+    const pickType = pick.type === 'show' ? 'show' : 'movie';
+    const inLibrary = (idMatch: SQL) =>
+      db.select().from(media).where(and(idMatch, eq(media.type, pickType), isNull(media.removedAt))).get() ?? null;
     let mediaRow = null;
     for (const guid of pick.guids) {
-      if (guid.startsWith('imdb://')) {
-        mediaRow = db.select().from(media).where(and(eq(media.imdbId, guid.slice(7)), isNull(media.removedAt))).get() ?? null;
-      } else if (guid.startsWith('tmdb://')) {
-        mediaRow = db.select().from(media).where(and(eq(media.tmdbId, guid.slice(7)), isNull(media.removedAt))).get() ?? null;
-      }
+      if (guid.startsWith('imdb://')) mediaRow = inLibrary(eq(media.imdbId, guid.slice(7)));
+      else if (guid.startsWith('tmdb://')) mediaRow = inLibrary(eq(media.tmdbId, guid.slice(7)));
       if (mediaRow) break;
     }
     const tmdbGuid = pick.guids.find((g) => g.startsWith('tmdb://'));

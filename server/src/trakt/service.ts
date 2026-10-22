@@ -73,8 +73,9 @@ export async function refreshAllTraktWatched(): Promise<void> {
   }
 }
 
-// The user's personal watched set, or null when they haven't connected Trakt
-// (callers then fall back to the sync account's watched flag).
+// The user's personal watched set, or null when Trakt has nothing to say —
+// not connected, or connected with no history matched yet (say, the first
+// import failed). Callers then fall through to the next source.
 export function getWatchedSet(userId: number): Set<number> | null {
   const user = db.select({ traktToken: users.traktToken }).from(users).where(eq(users.id, userId)).get();
   if (!user?.traktToken) return null;
@@ -83,5 +84,6 @@ export function getWatchedSet(userId: number): Set<number> | null {
     .from(userWatched)
     .where(eq(userWatched.userId, userId))
     .all();
+  if (!rows.length) return null;
   return new Set(rows.map((r) => r.mediaId));
 }

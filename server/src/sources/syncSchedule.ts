@@ -1,5 +1,6 @@
 import type { SyncMode } from '@marquee/shared';
 import { logger } from '../logger.js';
+import { CATCH_UP_MS } from '../schedules/service.js';
 import { getSetting } from '../settings.js';
 import { getConfiguredSources, isSyncRunning, runLibrarySync } from './index.js';
 
@@ -23,7 +24,15 @@ function lastRunMs(): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
-const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+// The most recent timeOfDay (server-local) at or before `now`; see
+// lastWeeklyOccurrence in schedules/service.ts for why occurrences, not minutes.
+function lastDailyOccurrence(now: Date, timeOfDay: string): Date {
+  const [h, m] = timeOfDay.split(':').map(Number);
+  const at = new Date(now);
+  at.setHours(h ?? 0, m ?? 0, 0, 0);
+  if (at.getTime() > now.getTime()) at.setDate(at.getDate() - 1);
+  return at;
+}
 
 // When the next automatic sync will run, or null when it's off. Intervals count
 // from the last sync of any kind — so syncing by hand pushes the next automatic
@@ -44,13 +53,14 @@ export function nextScheduledSync(now = new Date()): Date | null {
   return null;
 }
 
-function isSyncDue(now: Date): boolean {
+export function isSyncDue(now: Date): boolean {
   const { mode, timeOfDay } = getSyncSchedule();
   if (mode === 'interval') return nextScheduledSync(now)!.getTime() <= now.getTime();
   if (mode === 'daily') {
+    const occurrence = lastDailyOccurrence(now, timeOfDay).getTime();
     const last = lastRunMs();
-    // restart guard, and skips the run if the library was synced by hand moments ago
-    return hhmm(now) === timeOfDay && (last === null || now.getTime() - last > 90_000);
+    // A sync since then (by hand, too) serves this one; a missed one is made up for a while.
+    return (last === null || last < occurrence) && now.getTime() - occurrence <= CATCH_UP_MS;
   }
   return false;
 }

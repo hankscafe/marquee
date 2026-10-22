@@ -58,6 +58,11 @@ export async function startMocks() {
     sharedUserWatched: new Set(['101', '102']),
     // The plex.tv account token a sign-in PIN hands over once approved.
     pinToken: 'shared-plex-token',
+    // plex.tv watchlists by account token: the owner's runs to two pages.
+    watchlists: {
+      'owner-plex-token': Array.from({ length: 150 }, (_, i) => ({ title: `Item ${i}`, year: 2000, type: 'movie', Guid: [{ id: `tmdb://${9000 + i}` }] })),
+      'shared-plex-token': [9120, 1, 2].map((id) => ({ title: `Their ${id}`, type: 'movie', Guid: [{ id: `tmdb://${id}` }] })),
+    } as Record<string, { title: string; year?: number; type: string; Guid: { id: string }[] }[]>,
     // Jellyfin's accounts (each signs in with the password "jf-password").
     jellyfinUsers: [
       { Id: 'u1', Name: 'admin', Policy: { IsAdministrator: true } },
@@ -214,10 +219,7 @@ export async function startMocks() {
     const size = Number(req.headers['x-plex-container-size'] ?? 20);
     requests.discover.push(`${req.headers['x-plex-token']}:${start}:${size}`);
     if (url.pathname !== '/library/sections/watchlist/all') return json(res, {}, 404);
-    const all =
-      req.headers['x-plex-token'] === 'owner-plex-token'
-        ? Array.from({ length: 150 }, (_, i) => ({ title: `Item ${i}`, year: 2000, type: 'movie', Guid: [{ id: `tmdb://${9000 + i}` }] }))
-        : [9120, 1, 2].map((id) => ({ title: `Their ${id}`, type: 'movie', Guid: [{ id: `tmdb://${id}` }] }));
+    const all = data.watchlists[String(req.headers['x-plex-token'])] ?? [];
     json(res, { MediaContainer: { totalSize: all.length, offset: start, size: Math.min(size, all.length - start), Metadata: all.slice(start, start + size) } });
   });
 

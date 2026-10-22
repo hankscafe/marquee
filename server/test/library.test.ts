@@ -161,3 +161,15 @@ test('the franchise scan carries on past franchises TMDb no longer has', async (
   const fr = (await admin<FranchisesResponse>('GET', '/api/franchises')).data.franchises;
   assert.deepEqual(fr.map((f) => [f.name, f.owned, f.total]), [['Alien Collection', 2, 4]]);
 });
+
+test('spinning a list skips titles gone from the server', async () => {
+  const list = (await admin<{ id: number }>('POST', '/api/lists', { name: 'Two' })).data;
+  await admin('POST', `/api/lists/${list.id}/items`, { mediaId: byTitle.Heat });
+  await admin('POST', `/api/lists/${list.id}/items`, { mediaId: byTitle.Andor });
+  m.db.$client.prepare('update media set removed_at = 1 where id = ?').run(byTitle.Andor);
+  for (let i = 0; i < 10; i++) {
+    assert.equal((await admin<MediaItem>('POST', '/api/media/random', { listId: list.id })).data.title, 'Heat');
+  }
+  assert.equal((await admin('POST', `/api/lists/${list.id}/random`, {})).status, 404, 'the old list-only endpoint is gone');
+  m.db.$client.prepare('update media set removed_at = null where id = ?').run(byTitle.Andor);
+});

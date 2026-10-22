@@ -61,6 +61,24 @@ test('watchlist mode reads past the first page of a watchlist', async () => {
   assert.deepEqual(pages, ['owner-plex-token:0:100', 'owner-plex-token:100:100']);
 });
 
+test('a Trakt account with nothing imported yet doesn’t hide Plex history', async () => {
+  setUser('pal', { trakt_token: 'not-yet-imported' });
+  const r = await pal<CollectionProgress[]>('GET', '/api/collections');
+  assert.equal(r.data[0]!.watchedCount, 2, 'still pal’s own Plex history');
+});
+
+test('a watchlist pick only matches a library title of the same type', async () => {
+  // TMDb 95396 is Severance (a show); here it's a movie on both watchlists.
+  const both = [{ title: 'Not Severance', type: 'movie', Guid: [{ id: 'tmdb://95396' }] }];
+  const saved = { ...m.mocks.data.watchlists };
+  m.mocks.data.watchlists['owner-plex-token'] = both;
+  m.mocks.data.watchlists['shared-plex-token'] = both;
+  const r = await admin<WatchWithWatchlistResult>('POST', '/api/watchwith/watchlist', { partnerId: palId });
+  assert.equal(r.data.media, null);
+  assert.equal(r.data.tmdbId, 95396, 'offered as a request instead');
+  Object.assign(m.mocks.data.watchlists, saved);
+});
+
 test('Trakt history is matched again after each library sync', async () => {
   await admin('PUT', '/api/admin/settings', { traktClientId: 'trakt-id', traktClientSecret: 'trakt-secret' });
   setUser('pal', { trakt_token: 'trakt-token' });

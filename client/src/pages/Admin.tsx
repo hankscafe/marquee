@@ -116,7 +116,9 @@ function UsersPanel() {
     guestLabel(a).localeCompare(guestLabel(b), undefined, { sensitivity: 'base' }),
   );
   const deleteUser = (u: AdminUserInfo, name: string) => {
-    if (window.confirm(`Delete ${name}? Their votes and lists go with them.`)) removeUser.mutate(u.id);
+    if (window.confirm(`Delete ${name}? Their votes and private lists go with them; lists they shared become yours.`)) {
+      removeUser.mutate(u.id);
+    }
   };
 
   return (

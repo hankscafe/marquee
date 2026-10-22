@@ -84,10 +84,7 @@ export function Randomizer() {
   };
 
   const spin = useMutation({
-    mutationFn: () => {
-      if (source.kind === 'list') return api<MediaItem>(`/api/lists/${source.id}/random`, { body: {} });
-      return api<MediaItem>('/api/media/random', { body: buildFilters() });
-    },
+    mutationFn: () => api<MediaItem>('/api/media/random', { body: buildFilters() }),
     onSuccess: (item) => {
       // A short delay makes the reveal feel like a drum roll instead of a database query.
       setSpinning(true);

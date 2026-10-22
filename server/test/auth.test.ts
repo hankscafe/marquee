@@ -123,19 +123,18 @@ test('Plex sign-in hands back the code to compare, bound to this browser for 5 m
 
 test('passkeys, the Plex return link and Secure cookies come from the app URL alone', async () => {
   const browser = m.client();
-  let r = await browser<{ error: string }>('POST', '/api/auth/passkey/options', {});
-  assert.equal(r.status, 503, 'no app URL, no passkeys');
-  r = await browser<{ authUrl: string }>('POST', '/api/auth/plex/start', {}, { host: 'evil.example' });
-  assert.ok(!r.data.authUrl.includes('forwardUrl'), 'no return link taken from the Host header');
+  assert.equal((await browser('POST', '/api/auth/passkey/options', {})).status, 503, 'no app URL, no passkeys');
+  let plex = await browser<{ authUrl: string }>('POST', '/api/auth/plex/start', {}, { host: 'evil.example' });
+  assert.ok(!plex.data.authUrl.includes('forwardUrl'), 'no return link taken from the Host header');
   let cookie = String((await login('pat', 'second-password')).headers['set-cookie']);
   assert.ok(!/;\s*Secure/i.test(cookie), 'plain http and no app URL: not Secure');
 
   await admin('PUT', '/api/admin/settings', { appUrl: 'https://marquee.example.com/' });
-  r = await browser<{ rpId: string }>('POST', '/api/auth/passkey/options', {}, { host: 'evil.example' });
-  assert.equal(r.status, 200);
-  assert.equal(r.data.rpId, 'marquee.example.com');
-  r = await browser<{ authUrl: string }>('POST', '/api/auth/plex/start', {}, { host: 'evil.example' });
-  const forward = new URLSearchParams(r.data.authUrl.split('#?')[1]).get('forwardUrl');
+  const options = await browser<{ rpId: string }>('POST', '/api/auth/passkey/options', {}, { host: 'evil.example' });
+  assert.equal(options.status, 200);
+  assert.equal(options.data.rpId, 'marquee.example.com');
+  plex = await browser<{ authUrl: string }>('POST', '/api/auth/plex/start', {}, { host: 'evil.example' });
+  const forward = new URLSearchParams(plex.data.authUrl.split('#?')[1]).get('forwardUrl');
   assert.equal(forward, 'https://marquee.example.com/login?plexDone=1');
   cookie = String((await login('pat', 'second-password', '192.0.2.10')).headers['set-cookie']);
   assert.match(cookie, /;\s*Secure/i, 'an https app URL marks cookies Secure even over a proxy that drops X-Forwarded-Proto');

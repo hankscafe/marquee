@@ -178,8 +178,10 @@ function SpotlightWidget({ poll }: { poll: PollSummary }) {
                   {total} vote{total === 1 ? '' : 's'} so far
                   {leader && total > 0 ? ` · leading: ${leader.title}` : ''} — tap to cast yours
                 </>
-              ) : (
+              ) : poll.status === 'draft' ? (
                 'Draft — not yet open for voting'
+              ) : (
+                'Voting closed — no votes were cast'
               )}
             </p>
           </>
