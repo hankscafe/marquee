@@ -4,7 +4,11 @@ import { getSetting } from '../settings.js';
 // plus watched-history reads. The admin registers an API app at
 // https://trakt.tv/oauth/applications and enters its client id/secret in Admin settings.
 
-const TRAKT = 'https://api.trakt.tv';
+// Overridable so tests can point history sync at a fake Trakt.
+const TRAKT = process.env.TRAKT_API_URL ?? 'https://api.trakt.tv';
+const TIMEOUT_MS = 15_000;
+// A long watch history is one big response.
+const HISTORY_TIMEOUT_MS = 60_000;
 
 export function getTraktApp(): { clientId: string; clientSecret: string } | null {
   const clientId = getSetting('trakt.clientId');
@@ -33,6 +37,7 @@ export async function createDeviceCode(clientId: string): Promise<TraktDeviceCod
     method: 'POST',
     headers: traktHeaders(clientId),
     body: JSON.stringify({ client_id: clientId }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Trakt device-code request failed (${res.status}) — check the client id in Admin settings`);
   return (await res.json()) as TraktDeviceCode;
@@ -47,6 +52,7 @@ export async function pollDeviceToken(
     method: 'POST',
     headers: traktHeaders(clientId),
     body: JSON.stringify({ code: deviceCode, client_id: clientId, client_secret: clientSecret }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (res.status === 400) return 'pending';
   if (res.status === 404) throw new Error('Unknown Trakt code — start over');
@@ -73,6 +79,7 @@ export async function refreshAccessToken(
       redirect_uri: 'urn:ietf:wg:oauth:2.0:oob',
       grant_type: 'refresh_token',
     }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error('Your Trakt session expired — reconnect Trakt');
   const json = (await res.json()) as { access_token: string; refresh_token: string };
@@ -89,7 +96,10 @@ export interface TraktIds {
 export async function getWatched(clientId: string, token: string, type: 'movies' | 'shows'): Promise<TraktIds[]> {
   // Shows would otherwise come with every season and episode watched — only the ids are used.
   const query = type === 'shows' ? '?extended=noseasons' : '';
-  const res = await fetch(`${TRAKT}/sync/watched/${type}${query}`, { headers: traktHeaders(clientId, token) });
+  const res = await fetch(`${TRAKT}/sync/watched/${type}${query}`, {
+    headers: traktHeaders(clientId, token),
+    signal: AbortSignal.timeout(HISTORY_TIMEOUT_MS),
+  });
   if (res.status === 401 || res.status === 403) throw new TraktAuthError('Trakt token rejected');
   if (!res.ok) throw new Error(`Trakt watched-${type} request failed (${res.status})`);
   const json = (await res.json()) as ({ movie?: { ids?: TraktIds } } & { show?: { ids?: TraktIds } })[];

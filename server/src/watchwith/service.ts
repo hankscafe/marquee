@@ -69,6 +69,11 @@ export async function watchedSetForUser(userId: number): Promise<{ set: Set<numb
 }
 
 // plex.tv Discover watchlist for one account.
+// Overridable so tests can point it at a fake Discover service.
+const DISCOVER = process.env.PLEX_DISCOVER_URL ?? 'https://discover.provider.plex.tv';
+const WATCHLIST_PAGE_SIZE = 100;
+const WATCHLIST_MAX = 2000;
+
 export interface WatchlistItem {
   title: string;
   year: number | null;
@@ -76,20 +81,35 @@ export interface WatchlistItem {
   guids: string[];
 }
 
+// plex.tv hands a watchlist out a page at a time; keep asking until it's all here.
 export async function fetchWatchlist(token: string): Promise<WatchlistItem[]> {
-  const url = new URL('https://discover.provider.plex.tv/library/sections/watchlist/all');
-  url.searchParams.set('includeGuids', '1');
-  const res = await fetch(url, { headers: { 'X-Plex-Token': token, Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`plex.tv watchlist request failed (${res.status})`);
-  const json = (await res.json()) as {
-    MediaContainer?: { Metadata?: { title: string; year?: number; type?: string; Guid?: { id: string }[] }[] };
-  };
-  return (json.MediaContainer?.Metadata ?? []).map((m) => ({
-    title: m.title,
-    year: m.year ?? null,
-    type: m.type ?? 'movie',
-    guids: (m.Guid ?? []).map((g) => g.id),
-  }));
+  const items: WatchlistItem[] = [];
+  for (let start = 0; start < WATCHLIST_MAX; start += WATCHLIST_PAGE_SIZE) {
+    const url = new URL('library/sections/watchlist/all', `${DISCOVER}/`);
+    url.searchParams.set('includeGuids', '1');
+    const res = await fetch(url, {
+      headers: {
+        'X-Plex-Token': token,
+        Accept: 'application/json',
+        'X-Plex-Container-Start': String(start),
+        'X-Plex-Container-Size': String(WATCHLIST_PAGE_SIZE),
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`plex.tv watchlist request failed (${res.status})`);
+    const json = (await res.json()) as {
+      MediaContainer?: {
+        totalSize?: number;
+        Metadata?: { title: string; year?: number; type?: string; Guid?: { id: string }[] }[];
+      };
+    };
+    const page = json.MediaContainer?.Metadata ?? [];
+    for (const m of page) {
+      items.push({ title: m.title, year: m.year ?? null, type: m.type ?? 'movie', guids: (m.Guid ?? []).map((g) => g.id) });
+    }
+    if (page.length < WATCHLIST_PAGE_SIZE || items.length >= (json.MediaContainer?.totalSize ?? 0)) break;
+  }
+  return items;
 }
 
 // Stable identity for intersecting two watchlists: external id first, title+year fallback.

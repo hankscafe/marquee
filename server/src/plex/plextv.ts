@@ -7,7 +7,10 @@ import { getMachineIdentifier } from './client.js';
 // create a PIN, send the user to app.plex.tv/auth to approve it, then poll the
 // PIN until plex.tv attaches the account's auth token.
 
-const PLEX_TV = 'https://plex.tv';
+// Overridable so tests can point sign-in and server-access checks at a fake plex.tv.
+const PLEX_TV = process.env.PLEX_TV_URL ?? 'https://plex.tv';
+// Sign-in waits on these, so a stalled plex.tv mustn't hold it for undici's 300 s defaults.
+const TIMEOUT_MS = 15_000;
 
 // A stable client identifier is required for the PIN flow; generate once and persist.
 export function getClientId(): string {
@@ -31,6 +34,7 @@ export async function createLoginPin(): Promise<{ id: number; code: string }> {
   const res = await fetch(`${PLEX_TV}/api/v2/pins?strong=true`, {
     method: 'POST',
     headers: plexTvHeaders(),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`plex.tv PIN request failed (${res.status})`);
   const json = (await res.json()) as { id: number; code: string };
@@ -50,7 +54,7 @@ export function buildAuthUrl(code: string, forwardUrl?: string): string {
 
 // Returns the account token once the user has approved the PIN, else null.
 export async function checkLoginPin(id: number): Promise<string | null> {
-  const res = await fetch(`${PLEX_TV}/api/v2/pins/${id}`, { headers: plexTvHeaders() });
+  const res = await fetch(`${PLEX_TV}/api/v2/pins/${id}`, { headers: plexTvHeaders(), signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) throw new Error(`plex.tv PIN check failed (${res.status})`);
   const json = (await res.json()) as { authToken?: string | null };
   return json.authToken || null;
@@ -59,6 +63,7 @@ export async function checkLoginPin(id: number): Promise<string | null> {
 export async function getPlexAccount(token: string): Promise<{ id: number; username: string }> {
   const res = await fetch(`${PLEX_TV}/api/v2/user`, {
     headers: { ...plexTvHeaders(), 'X-Plex-Token': token },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`plex.tv account lookup failed (${res.status})`);
   const json = (await res.json()) as { id: number; username?: string; title?: string };
@@ -78,6 +83,7 @@ export interface PlexHomeUser {
 export async function getHomeUsers(ownerToken: string): Promise<PlexHomeUser[]> {
   const res = await fetch(`${PLEX_TV}/api/v2/home/users`, {
     headers: { ...plexTvHeaders(), 'X-Plex-Token': ownerToken },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`plex.tv home-users request failed (${res.status})`);
   const json = (await res.json()) as PlexHomeUser[] | { users?: PlexHomeUser[] };
@@ -94,6 +100,7 @@ export interface PlexFriend {
 export async function getFriends(ownerToken: string): Promise<PlexFriend[]> {
   const res = await fetch(`${PLEX_TV}/api/v2/friends`, {
     headers: { ...plexTvHeaders(), 'X-Plex-Token': ownerToken },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`plex.tv friends request failed (${res.status})`);
   const json = (await res.json()) as PlexFriend[] | { friends?: PlexFriend[] };
@@ -113,6 +120,7 @@ async function findServerResource(
   if (!machineId) throw new Error('Could not identify the Plex server — check the Plex settings in Admin');
   const res = await fetch(`${PLEX_TV}/api/v2/resources?includeHttps=1`, {
     headers: { ...plexTvHeaders(), 'X-Plex-Token': userToken },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`plex.tv resources request failed (${res.status})`);
   const resources = (await res.json()) as { clientIdentifier?: string; provides?: string; accessToken?: string }[];
@@ -139,6 +147,7 @@ export async function getServerAccessToken(
   if (!accessToken) return null;
   const res = await fetch(serverUrl(server.url, 'library/sections'), {
     headers: { 'X-Plex-Token': accessToken, Accept: 'application/json' },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (res.ok) return accessToken;
   if (res.status === 401 || res.status === 403) return null;

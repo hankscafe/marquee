@@ -16,9 +16,18 @@ export function getSeerrConfig(): SeerrConfig | null {
   return url && apiKey ? { url, apiKey, kind } : null;
 }
 
+// Overseerr and Jellyseerr read the key from X-Api-Key; Ombi only from ApiKey.
+function keyHeader(cfg: SeerrConfig): Record<string, string> {
+  return cfg.kind === 'ombi' ? { ApiKey: cfg.apiKey } : { 'X-Api-Key': cfg.apiKey };
+}
+
 export async function testSeerr(cfg: SeerrConfig): Promise<void> {
+  // Ombi's status page is public, but it still refuses a wrong key when one is sent.
   const target = serverUrl(cfg.url, cfg.kind === 'ombi' ? 'api/v1/Status' : 'api/v1/settings/main');
-  const res = await fetch(target, { headers: { 'X-Api-Key': cfg.apiKey, Accept: 'application/json' } });
+  const res = await fetch(target, {
+    headers: { ...keyHeader(cfg), Accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+  });
   if (!res.ok) throw new Error(`${cfg.kind} responded ${res.status} — check the URL and API key`);
 }
 
@@ -50,7 +59,7 @@ async function seerrUsers(cfg: SeerrConfig): Promise<SeerrUser[]> {
   const users: SeerrUser[] = [];
   for (let skip = 0; ; skip += 100) {
     const res = await fetch(serverUrl(cfg.url, `api/v1/user?take=100&skip=${skip}`), {
-      headers: { 'X-Api-Key': cfg.apiKey, Accept: 'application/json' },
+      headers: { ...keyHeader(cfg), Accept: 'application/json' },
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`The request service responded ${res.status} while looking up its users`);
@@ -114,7 +123,7 @@ export async function requestMovie(cfg: SeerrConfig, tmdbId: number, asSeerrUser
   const res = await fetch(target, {
     method: 'POST',
     headers: {
-      'X-Api-Key': cfg.apiKey,
+      ...keyHeader(cfg),
       'Content-Type': 'application/json',
       ...(asSeerrUser !== null ? { 'X-Api-User': String(asSeerrUser) } : {}),
     },

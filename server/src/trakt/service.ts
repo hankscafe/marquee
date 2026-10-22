@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, isNotNull } from 'drizzle-orm';
 import { decryptSecret, encryptSecret } from '../crypto.js';
 import { db } from '../db/index.js';
 import { media, users, userWatched } from '../db/schema.js';
@@ -56,6 +56,21 @@ export async function refreshUserWatched(userId: number): Promise<number> {
   });
 
   return matched.length;
+}
+
+// Trakt history is matched to the titles in the library at the time, so after a
+// library sync every connected user is matched again — titles that just arrived
+// count as watched too. One user at a time; a failure only skips that user.
+export async function refreshAllTraktWatched(): Promise<void> {
+  if (!getTraktApp()) return;
+  const connected = db.select({ id: users.id }).from(users).where(isNotNull(users.traktToken)).all();
+  for (const { id } of connected) {
+    try {
+      await refreshUserWatched(id);
+    } catch (err) {
+      logger.warn({ userId: id, err: err instanceof Error ? err.message : String(err) }, 'trakt refresh after sync failed');
+    }
+  }
 }
 
 // The user's personal watched set, or null when they haven't connected Trakt

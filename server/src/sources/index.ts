@@ -1,4 +1,5 @@
 import { logger } from '../logger.js';
+import { refreshAllTraktWatched } from '../trakt/service.js';
 import { getPlexConfig, setSetting } from '../settings.js';
 import { fetchPlexData } from '../plex/sync.js';
 import { fetchJfData, getJfConfig } from '../jellyfin/client.js';
@@ -64,6 +65,7 @@ export async function runLibrarySync(): Promise<{ results: SourceSyncResult[]; e
   try {
     const outcome = await syncAllSources();
     setSetting('sync.lastError', outcome.errors.join(' · '));
+    void refreshAllTraktWatched();
     return outcome;
   } catch (err) {
     setSetting('sync.lastError', err instanceof Error ? err.message : 'sync failed');

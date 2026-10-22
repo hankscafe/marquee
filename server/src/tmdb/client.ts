@@ -14,7 +14,7 @@ export function getTmdbKey(): string | null {
 async function tmdbGet<T>(path: string, key: string): Promise<T> {
   const url = new URL(`${TMDB}/${path}`);
   url.searchParams.set('api_key', key);
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
   if (res.status === 401) throw new Error('TMDb rejected the API key — check it in Admin settings');
   if (!res.ok) throw new Error(`TMDb request failed (${res.status})`);
   return res.json() as Promise<T>;
