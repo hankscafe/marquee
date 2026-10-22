@@ -23,6 +23,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run typecheck
+      - run: npm test
 
   docker:
     name: Build & push container

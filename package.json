@@ -13,6 +13,7 @@
     "build": "npm run build -w client && npm run build -w server",
     "start": "npm run start -w server",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
+    "test": "npm run test -w server",
     "db:generate": "npm run db:generate -w server"
   },
   "devDependencies": {

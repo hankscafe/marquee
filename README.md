@@ -41,7 +41,7 @@ Open any collection to see its titles and who's watched what, or spin an unwatch
 
 ### Watch With
 
-Two people, one pick. **Library mode** finds a random title *neither* of you has seen (per-person history via Trakt, your own Plex account, or the server account). **Watchlist mode** intersects both plex.tv watchlists and picks from the overlap — with a request button if the pick isn't in the library yet.
+Two people, one pick. **Library mode** finds a random title *neither* of you has seen (per-person history via Trakt, your own Plex account, or the server account). **Watchlist mode** intersects both plex.tv watchlists and picks from the overlap — with a request button if the pick isn't in the library yet. Anyone who'd rather not be picked can switch Watch With off for themselves on their Account page.
 
 ![Watch With](docs/screenshots/watch-with.png)
 
@@ -187,7 +187,8 @@ curl -H "Authorization: Bearer $KEY" "https://marquee.example.com/api/widget/pol
 - Integration secrets and user OAuth tokens are **encrypted at rest** (AES-256-GCM) with a key derived from the instance secret — a copy of the database alone exposes nothing
 - The widget API key is encrypted at rest too, sent only as a header, and compared in constant time
 - Passwords hashed with scrypt; sessions in signed, HTTP-only, SameSite cookies (Secure over TLS)
-- Rate limiting on all credential endpoints; security headers via Helmet
+- Rate limiting on all credential endpoints; security headers via Helmet, including a Content-Security-Policy
+- Changes requested from another site's page (votes included) are refused, based on the browser's `Sec-Fetch-Site` header
 - Media-server tokens/keys never reach the browser — posters proxy through the server
 - Registration can be disabled for invite-only instances
 
@@ -218,6 +219,7 @@ npm install
 npm run dev        # API on :3000, client with HMR on :5173
 npm run build      # production build
 npm run typecheck
+npm test           # API tests against a throwaway database and mock media servers
 npm run db:generate  # regenerate migrations after schema changes
 ```
 
