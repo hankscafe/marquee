@@ -261,7 +261,7 @@ export function Randomizer() {
       </div>
 
       {pick && !spinning && (
-        <Modal onClose={() => setPick(null)}>
+        <Modal label={`Tonight’s pick: ${pick.title}`} onClose={() => setPick(null)}>
           <div className="mx-auto max-w-60">
             <Poster mediaId={pick.id} title={pick.title} className="rounded-lg" />
           </div>

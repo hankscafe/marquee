@@ -59,7 +59,7 @@ export function MediaDetailsModal({ mediaId, onClose }: { mediaId: number | null
 
   if (mediaId === null) return null;
   return (
-    <Modal onClose={onClose}>
+    <Modal label={item?.title ?? 'Title details'} onClose={onClose}>
       {item ? (
         <div className="space-y-4">
           <div className="flex gap-4">

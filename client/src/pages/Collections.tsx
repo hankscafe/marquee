@@ -84,7 +84,7 @@ function Franchises() {
       </div>
 
       {selectedId !== null && (
-        <Modal wide onClose={() => setSelectedId(null)}>
+        <Modal label={detail?.name ?? 'Film series'} wide onClose={() => setSelectedId(null)}>
           {detail ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -359,7 +359,7 @@ export function Collections() {
       )}
 
       {selectedId !== null && (
-        <Modal wide onClose={() => setSelectedId(null)}>
+        <Modal label={detail?.title ?? 'Collection'} wide onClose={() => setSelectedId(null)}>
           {detail ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">

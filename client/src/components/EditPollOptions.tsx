@@ -66,7 +66,7 @@ export function EditPollOptions({ poll, onClose }: { poll: PollDetail; onClose: 
   const inPoll = new Set(poll.options.map((o) => o.mediaId));
 
   return (
-    <Modal wide onClose={dismiss}>
+    <Modal label="Edit poll" wide onClose={dismiss}>
       <div className="space-y-5">
         <div className="flex items-start justify-between gap-3">
           <div>
