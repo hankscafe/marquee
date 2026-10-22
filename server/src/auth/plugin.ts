@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
-import { and, eq, gt, inArray, lt, lte, notInArray, or } from 'drizzle-orm';
+import { and, eq, gt, inArray, lt, lte, ne, notInArray, or } from 'drizzle-orm';
 import { config } from '../config.js';
 import { db } from '../db/index.js';
 import { sessions, users } from '../db/schema.js';
@@ -50,6 +50,10 @@ export function pruneSessions(now = new Date()): number {
 export async function createSession(reply: FastifyReply, userId: number) {
   const token = crypto.randomBytes(32).toString('hex');
   const now = new Date();
+  // This browser is getting a new session, so the one it held before is dead
+  // weight — revoke it rather than leave a row that still works.
+  const previous = sessionToken(reply.request);
+  if (previous) db.delete(sessions).where(eq(sessions.token, previous)).run();
   db.insert(sessions)
     .values({ token, userId, expiresAt: new Date(now.getTime() + SESSION_TTL_MS), lastSeenAt: now })
     .run();
@@ -64,15 +68,28 @@ export async function createSession(reply: FastifyReply, userId: number) {
   });
 }
 
-export function destroySession(request: FastifyRequest, reply: FastifyReply) {
+// The session token in this request's signed cookie, if it has a valid one.
+function sessionToken(request: FastifyRequest): string | null {
   const raw = request.cookies[COOKIE_NAME];
-  if (raw) {
-    const unsigned = request.unsignCookie(raw);
-    if (unsigned.valid && unsigned.value) {
-      db.delete(sessions).where(eq(sessions.token, unsigned.value)).run();
-    }
-  }
+  if (!raw) return null;
+  const unsigned = request.unsignCookie(raw);
+  return unsigned.valid && unsigned.value ? unsigned.value : null;
+}
+
+export function destroySession(request: FastifyRequest, reply: FastifyReply) {
+  const token = sessionToken(request);
+  if (token) db.delete(sessions).where(eq(sessions.token, token)).run();
   reply.clearCookie(COOKIE_NAME, { path: '/' });
+}
+
+// Sign a user out everywhere except the browser asking — after a password
+// change, whoever else held a session is exactly who should lose it.
+export function revokeOtherSessions(request: FastifyRequest, userId: number): number {
+  const keep = sessionToken(request);
+  return db
+    .delete(sessions)
+    .where(keep ? and(eq(sessions.userId, userId), ne(sessions.token, keep)) : eq(sessions.userId, userId))
+    .run().changes;
 }
 
 export const authPlugin = fp(async (app: FastifyInstance) => {

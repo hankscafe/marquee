@@ -66,7 +66,7 @@ export async function adminUserRoutes(app: FastifyInstance) {
       .insert(users)
       .values({
         username: parsed.data.username,
-        passwordHash: hashPassword(parsed.data.password),
+        passwordHash: await hashPassword(parsed.data.password),
         isAdmin: parsed.data.isAdmin,
       })
       .returning()
@@ -92,7 +92,7 @@ export async function adminUserRoutes(app: FastifyInstance) {
     db.update(users)
       .set({
         ...(parsed.data.isAdmin !== undefined ? { isAdmin: parsed.data.isAdmin } : {}),
-        ...(parsed.data.password ? { passwordHash: hashPassword(parsed.data.password) } : {}),
+        ...(parsed.data.password ? { passwordHash: await hashPassword(parsed.data.password) } : {}),
       })
       .where(eq(users.id, id))
       .run();

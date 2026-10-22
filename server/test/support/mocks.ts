@@ -58,6 +58,12 @@ export async function startMocks() {
     sharedUserWatched: new Set(['101', '102']),
     // The plex.tv account token a sign-in PIN hands over once approved.
     pinToken: 'shared-plex-token',
+    // Jellyfin's accounts (each signs in with the password "jf-password").
+    jellyfinUsers: [
+      { Id: 'u1', Name: 'admin', Policy: { IsAdministrator: true } },
+      { Id: 'u2', Name: 'jfuser' },
+      { Id: 'u3', Name: '' },
+    ] as { Id: string; Name: string; Policy?: { IsAdministrator?: boolean } }[],
   };
   const requests = {
     plex: [] as string[],
@@ -106,14 +112,22 @@ export async function startMocks() {
   });
 
   // Jellyfin behind a path prefix (/jf), so every request must keep it.
-  const jellyfin = await listen((req, res) => {
+  const jellyfin = await listen(async (req, res) => {
     const url = new URL(req.url!, 'http://x');
     requests.jellyfin.push(url.pathname + url.search);
+    // Sign-in sends the person's own credentials instead of the API key.
+    if (url.pathname === '/jf/Users/AuthenticateByName' && req.method === 'POST') {
+      let raw = '';
+      for await (const chunk of req) raw += chunk;
+      const { Username, Pw } = JSON.parse(raw) as { Username: string; Pw: string };
+      const account = data.jellyfinUsers.find((u) => u.Name === Username && Pw === 'jf-password');
+      return account ? json(res, { User: { Id: account.Id, Name: account.Name } }) : json(res, {}, 401);
+    }
     if (req.headers['x-emby-token'] !== 'jf-key') return json(res, {}, 401);
     if (!url.pathname.startsWith('/jf/')) return json(res, { error: 'prefix lost' }, 404);
     const q = url.pathname.slice(3);
     if (q === '/System/Info') return json(res, { Id: 'jf-server', ServerName: 'Mock JF', Version: '10.10' });
-    if (q === '/Users') return json(res, [{ Id: 'u1', Name: 'admin', Policy: { IsAdministrator: true } }]);
+    if (q === '/Users') return json(res, data.jellyfinUsers);
     if (q === '/Users/u1/Views') return json(res, { Items: [{ Id: 'v1', Name: 'Films', CollectionType: 'movies' }] });
     if (q === '/Users/u1/Items' && url.searchParams.get('IncludeItemTypes') === 'BoxSet') return json(res, { Items: [] });
     if (q === '/Users/u1/Items' && url.searchParams.get('ParentId') === 'v1') {

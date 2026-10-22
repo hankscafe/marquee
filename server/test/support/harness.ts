@@ -87,6 +87,7 @@ export async function withLibrary(m: Marquee) {
     jellyfinUrl: m.mocks.urls.jellyfin,
     jellyfinApiKey: 'jf-key',
     appUrl: 'http://marquee.test/',
+    allowRegistration: true, // so signUp() works; closed is the default
   });
   if (r.status !== 200) throw new Error(`settings failed: ${r.status}`);
   r = await admin('POST', '/api/admin/sync', {});

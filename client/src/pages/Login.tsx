@@ -18,6 +18,10 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [plexPinId, setPlexPinId] = useState<number | null>(null);
+  // Shown so the person approving can check it against the code plex.tv
+  // displays — a PIN sign-in can't otherwise tell an approval they meant from
+  // one someone else's "sign in to Marquee" link asked them for.
+  const [plexCode, setPlexCode] = useState<string | null>(null);
   const [accountKind, setAccountKind] = useState<'local' | 'jellyfin' | 'emby'>('local');
   const plexPopup = useRef<Window | null>(null);
   // Set when the browser blocked the Plex popup: offered as a link instead.
@@ -111,10 +115,11 @@ export function Login() {
     // popups opened after waiting on the network. It's pointed at Plex below.
     const popup = window.open('', 'plex-signin', 'popup=yes,width=600,height=760');
     try {
-      const res = await api<{ pinId: number; authUrl: string }>('/api/auth/plex/start', { body: {} });
+      const res = await api<{ pinId: number; code: string; authUrl: string }>('/api/auth/plex/start', { body: {} });
       if (popup) popup.location.href = res.authUrl;
       else setPlexAuthUrl(res.authUrl); // still blocked: offer a link
       plexPopup.current = popup;
+      setPlexCode(res.code);
       setPlexPinId(res.pinId);
     } catch (err) {
       popup?.close();
@@ -290,6 +295,16 @@ export function Login() {
                   >
                     {plexPinId !== null ? 'Waiting for Plex — approve in the popup…' : 'Sign in with Plex'}
                   </button>
+                  {plexPinId !== null && plexCode && (
+                    <div className="rounded-md border border-neon-500/20 bg-neon-500/5 px-3 py-2 text-center">
+                      <p className="text-xs tracking-widest text-stone-400 uppercase">Your code</p>
+                      <p className="font-display text-2xl tracking-[0.3em] text-neon-300">{plexCode}</p>
+                      <p className="mt-1 text-xs text-stone-400">
+                        Only approve if plex.tv shows this same code. If you got here from a link someone sent you,
+                        close it and start again from Marquee.
+                      </p>
+                    </div>
+                  )}
                   {plexPinId !== null && plexAuthUrl && (
                     <p className="text-center text-sm text-stone-300">
                       Your browser blocked the popup —{' '}

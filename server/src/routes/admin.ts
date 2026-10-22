@@ -12,7 +12,7 @@ import { startDiscordBot, testDiscord } from '../discord/bot.js';
 import { testJf } from '../jellyfin/client.js';
 import { getSections } from '../plex/client.js';
 import { clearSeerrUserCache, getSeerrConfig, testSeerr } from '../seerr/client.js';
-import { getAppUrl, getPlexConfig, getSetting, setSetting } from '../settings.js';
+import { getAppUrl, getPlexConfig, getSetting, registrationOpen, setSetting } from '../settings.js';
 import { isSyncRunning, runLibrarySync } from '../sources/index.js';
 import { syncStatus } from '../sources/syncSchedule.js';
 import { getScanState, startFranchiseScan } from '../tmdb/scan.js';
@@ -79,7 +79,7 @@ export async function adminRoutes(app: FastifyInstance) {
     seerrUrl: getSetting('seerr.url'),
     seerrKind: getSetting('seerr.kind') === 'ombi' ? ('ombi' as const) : ('overseerr' as const),
     seerrKeySet: !!getSetting('seerr.apiKey'),
-    allowRegistration: getSetting('auth.allowRegistration') !== 'false',
+    allowRegistration: registrationOpen(),
     widgetKeySet: !!getSetting('widget.apiKey'),
     ...syncStatus(),
   });

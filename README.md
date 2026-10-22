@@ -59,7 +59,7 @@ Post a poll to a channel and people vote with buttons — **no Marquee account n
 
 - **Media servers**: Plex, Jellyfin, and Emby — any combination at once, with cross-server de-duplication and automatic library sync (every few hours or daily at a set time). Titles removed from a server disappear from search and the randomizer but stay in past polls and lists, and come back if re-added
 - **Sign-in options**: local accounts, Sign in with Plex (popup PIN flow), Jellyfin/Emby credentials, OIDC (Authentik/Authelia/Keycloak/…), and passkeys (WebAuthn)
-- **User management**: create accounts, import your Plex Home members and friends in one click (safe to re-run as new people join), set/reset passwords, promote admins, disable open registration. Usernames are case-insensitive — "Michael" and "michael" are the same account
+- **User management**: create accounts, import your Plex Home members and friends in one click (safe to re-run as new people join), set/reset passwords (people can change their own on the Account page), promote admins, open registration to anyone (off by default). Usernames are case-insensitive — "Michael" and "michael" are the same account
 - **Trakt**: users connect their own accounts for personal watch status everywhere
 - **Issue reports**: users flag problems to the admin in-app
 - **Database health**: a daily integrity check warns admins about database damage (see [Database health](#database-health))
@@ -186,13 +186,17 @@ curl -H "Authorization: Bearer $KEY" "https://marquee.example.com/api/widget/pol
 
 - Integration secrets and user OAuth tokens are **encrypted at rest** (AES-256-GCM) with a key derived from the instance secret — a copy of the database alone exposes nothing
 - The widget API key is encrypted at rest too, sent only as a header, and compared in constant time
-- Passwords hashed with scrypt; sessions in signed, HTTP-only, SameSite cookies (Secure over TLS)
+- Passwords hashed with scrypt at an OWASP-recommended cost; the cost is recorded in each hash, so it can be raised later and older hashes upgrade themselves on the next sign-in
+- Failed password sign-ins back off **per account**, not per IP address, so the limit can't be dodged by changing addresses. The wait is capped, forgotten after an hour, and never applies to Plex, SSO or passkey sign-in — there's always another way in
+- Sessions in signed, HTTP-only, SameSite cookies (Secure over TLS)
 - Rate limiting on all credential endpoints; security headers via Helmet, including a Content-Security-Policy
 - Changes requested from another site's page (votes included) are refused, based on the browser's `Sec-Fetch-Site` header
 - Media-server tokens/keys never reach the browser — posters proxy through the server
-- Registration can be disabled for invite-only instances
+- **Registration is closed by default** — turn it on under Admin → Users for an open instance. While it's closed, Jellyfin/Emby sign-ins don't create accounts either, so connecting those servers for library sync doesn't quietly let everyone on them in
 
 **Run it behind HTTPS** (Caddy, Traefik, nginx, or a Cloudflare tunnel). Passkeys require it (or localhost), and it's the right call for anything public-facing. Marquee sits happily behind a reverse proxy on the same host, Docker network or LAN (see `TRUST_PROXY`).
+
+**Signing in with Plex** uses plex.tv's PIN flow, which — like every device-code sign-in ([RFC 8628 §5.1](https://www.rfc-editor.org/rfc/rfc8628#section-5.1)) — can't tell an approval you meant from one you were talked into. Marquee shows the code next to the Plex button: **only approve a Plex sign-in whose code matches the one Marquee just showed you.** If a "sign in to Marquee" link arrives from someone else, close it and start again from Marquee itself.
 
 ## Database health
 

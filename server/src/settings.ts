@@ -63,6 +63,12 @@ export function migrateSecretsAtRest() {
   if (migrated > 0) logger.info({ migrated }, 'encrypted legacy plaintext secrets at rest');
 }
 
+// Open sign-up stays off unless an admin turns it on (Admin → Users). It also
+// decides whether a Jellyfin/Emby sign-in may create a new account.
+export function registrationOpen(): boolean {
+  return getSetting('auth.allowRegistration') === 'true';
+}
+
 // The public URL people reach Marquee at (set in Admin), without a trailing slash.
 export function getAppUrl(): string | null {
   const url = getSetting('app.url');
