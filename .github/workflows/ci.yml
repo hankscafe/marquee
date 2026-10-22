@@ -24,6 +24,20 @@ jobs:
       - run: npm run build
       - run: npm run typecheck
       - run: npm test
+      # Only what ships: the image installs with --omit=dev, so an advisory in
+      # build tooling mustn't block a release. Those are reported below instead.
+      - run: npm audit --omit=dev --audit-level=high
+
+  audit-dev:
+    name: Dev dependency advisories (non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm audit --audit-level=moderate
+        continue-on-error: true
 
   docker:
     name: Build & push container
