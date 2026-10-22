@@ -445,6 +445,47 @@ function JfServerCard({
 }
 
 // Read-only widget API: generate/rotate/revoke the key and show usage.
+// The address people reach Marquee at. Several features need it, so it has a card of its own.
+function AppUrlCard({ saved }: { saved: string | null | undefined }) {
+  const queryClient = useQueryClient();
+  const [appUrl, setAppUrl] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (saved) setAppUrl(saved);
+  }, [saved]);
+  const save = useMutation({
+    mutationFn: () => api<AdminSettings>('/api/admin/settings', { method: 'PUT', body: { appUrl } }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['admin', 'settings'], data);
+      setMsg('✓ Saved');
+    },
+    onError: (err) => setMsg(err instanceof ApiError ? `✗ ${err.message}` : '✗ Save failed'),
+  });
+
+  return (
+    <section className="card space-y-4 p-5">
+      <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Public app URL</h2>
+      <p className="text-sm text-stone-400">
+        The address people use to reach Marquee. Passkeys only work once it’s set, Sign in with Plex returns here, and
+        when it starts with https session cookies are always marked Secure. It’s also used for links in Discord, the
+        widget API and the SSO redirect.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <input
+          className="input min-w-60 flex-1"
+          placeholder="e.g. https://marquee.example.com"
+          value={appUrl}
+          onChange={(e) => setAppUrl(e.target.value)}
+        />
+        <button className="btn btn-neon" disabled={save.isPending || !appUrl.trim()} onClick={() => save.mutate()}>
+          Save
+        </button>
+      </div>
+      {msg && <p className="text-sm text-stone-300">{msg}</p>}
+    </section>
+  );
+}
+
 function WidgetApiCard({ keySet, appUrl }: { keySet: boolean | undefined; appUrl: string | null | undefined }) {
   const queryClient = useQueryClient();
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
@@ -485,7 +526,7 @@ function WidgetApiCard({ keySet, appUrl }: { keySet: boolean | undefined; appUrl
       </p>
       <p className="text-sm text-stone-400">
         Endpoint: <code className="break-all text-stone-300">{endpoint}</code>
-        {!appUrl && <span className="text-stone-500"> — set the public app URL (Discord card) so links resolve.</span>}
+        {!appUrl && <span className="text-stone-500"> — set the public app URL (Integrations tab) so links resolve.</span>}
       </p>
       {generatedKey && (
         <div className="rounded-lg border border-neon-500/25 bg-ink-950/60 p-3">
@@ -630,7 +671,6 @@ export function Admin() {
   const [seerrKind, setSeerrKind] = useState<'overseerr' | 'ombi'>('overseerr');
   const [discordToken, setDiscordToken] = useState('');
   const [discordChannelId, setDiscordChannelId] = useState('');
-  const [appUrl, setAppUrl] = useState('');
   const [oidcIssuer, setOidcIssuer] = useState('');
   const [oidcClientId, setOidcClientId] = useState('');
   const [oidcClientSecret, setOidcClientSecret] = useState('');
@@ -655,11 +695,10 @@ export function Admin() {
     if (settings?.seerrUrl) setSeerrUrl(settings.seerrUrl);
     if (settings?.seerrKind) setSeerrKind(settings.seerrKind);
     if (settings?.discordChannelId) setDiscordChannelId(settings.discordChannelId);
-    if (settings?.appUrl) setAppUrl(settings.appUrl);
     if (settings?.oidcIssuer) setOidcIssuer(settings.oidcIssuer);
     if (settings?.oidcClientId) setOidcClientId(settings.oidcClientId);
     if (settings?.oidcLabel) setOidcLabel(settings.oidcLabel);
-  }, [settings?.plexUrl, settings?.traktClientId, settings?.seerrUrl, settings?.seerrKind, settings?.discordChannelId, settings?.appUrl, settings?.oidcIssuer, settings?.oidcClientId, settings?.oidcLabel]);
+  }, [settings?.plexUrl, settings?.traktClientId, settings?.seerrUrl, settings?.seerrKind, settings?.discordChannelId, settings?.oidcIssuer, settings?.oidcClientId, settings?.oidcLabel]);
 
   // Scan progress: poll every 2s while a scan is running.
   const { data: scan } = useQuery({
@@ -839,6 +878,7 @@ export function Admin() {
 
       {tab === 'integrations' && (
         <>
+      <AppUrlCard saved={settings?.appUrl} />
       <section className="card space-y-4 p-5">
         <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Trakt</h2>
         <p className="text-sm text-stone-400">
@@ -938,12 +978,6 @@ export function Admin() {
           value={discordChannelId}
           onChange={(e) => setDiscordChannelId(e.target.value)}
         />
-        <input
-          className="input"
-          placeholder="Public Marquee URL for links in Discord (optional), e.g. https://marquee.example.com"
-          value={appUrl}
-          onChange={(e) => setAppUrl(e.target.value)}
-        />
         <div className="flex flex-wrap gap-2">
           <button
             className="btn btn-neon"
@@ -952,7 +986,6 @@ export function Admin() {
               save.mutate({
                 discordBotToken: discordToken || undefined,
                 discordChannelId,
-                appUrl: appUrl || undefined,
               })
             }
           >
@@ -975,7 +1008,7 @@ export function Admin() {
               <code className="break-all text-stone-300">{settings.oidcRedirectUri}</code>
             </>
           ) : (
-            <> Set the public app URL (in the Discord card above) first — OIDC needs it for the redirect URI.</>
+            <> Set the public app URL (top of this tab) first — OIDC needs it for the redirect URI.</>
           )}
         </p>
         <input

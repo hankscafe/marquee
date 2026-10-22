@@ -5,6 +5,7 @@ import { and, eq, gt, inArray, lt, lte, ne, notInArray, or } from 'drizzle-orm';
 import { config } from '../config.js';
 import { db } from '../db/index.js';
 import { sessions, users } from '../db/schema.js';
+import { getAppUrl } from '../settings.js';
 
 export interface SessionUser {
   id: number;
@@ -47,6 +48,15 @@ export function pruneSessions(now = new Date()): number {
     .run().changes;
 }
 
+// Whether to mark cookies Secure. A TLS-terminating proxy that forgets
+// X-Forwarded-Proto makes an https site look like http, which would hand out
+// the session cookie without Secure; so the app URL's scheme decides, and the
+// request only when no app URL is set.
+export function cookieSecure(request: FastifyRequest): boolean {
+  const appUrl = getAppUrl();
+  return appUrl ? appUrl.startsWith('https:') : request.protocol === 'https';
+}
+
 export async function createSession(reply: FastifyReply, userId: number) {
   const token = crypto.randomBytes(32).toString('hex');
   const now = new Date();
@@ -62,8 +72,7 @@ export async function createSession(reply: FastifyReply, userId: number) {
     httpOnly: true,
     sameSite: 'lax',
     signed: true,
-    // Secure when served over TLS (trustProxy makes this reflect X-Forwarded-Proto)
-    secure: reply.request.protocol === 'https',
+    secure: cookieSecure(reply.request),
     maxAge: SESSION_TTL_MS / 1000,
   });
 }

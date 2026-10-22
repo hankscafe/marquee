@@ -4,7 +4,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { media, pollOptions, polls, users, votes } from '../db/schema.js';
-import { requireAdmin } from '../auth/plugin.js';
+import { cookieSecure, requireAdmin } from '../auth/plugin.js';
 import { updatePollMessage } from '../discord/bot.js';
 import { emitPollUpdate, streamPollEvents } from '../events.js';
 import { serializePollDetail, serializePublicPoll } from '../polls/service.js';
@@ -69,7 +69,7 @@ function guestAccountId(request: FastifyRequest, reply: FastifyReply): number {
     httpOnly: true,
     sameSite: 'lax',
     signed: true,
-    secure: request.protocol === 'https',
+    secure: cookieSecure(request),
     maxAge: VOTER_COOKIE_MAX_AGE,
   });
   return db

@@ -102,6 +102,8 @@ Open the app, create the first admin account, then in **Admin → Media servers*
 
 Everything else — media servers, Trakt, TMDb, Discord, request services, OIDC, the public app URL — is configured in the Admin UI, not env vars.
 
+> **Set the public app URL** (Admin → Integrations) on any instance people reach by a name. Passkeys only work once it's set, Sign in with Plex returns there, OIDC needs it for the redirect URI, and when it's `https` session cookies are always marked `Secure` — even if your proxy forgets `X-Forwarded-Proto`. Marquee then expects to be used at that address: with an `https` app URL, signing in over plain `http` (say, by LAN IP) won't keep you signed in.
+
 ### Integrations (all optional)
 
 | Integration | What you need | What it unlocks |
@@ -188,7 +190,7 @@ curl -H "Authorization: Bearer $KEY" "https://marquee.example.com/api/widget/pol
 - The widget API key is encrypted at rest too, sent only as a header, and compared in constant time
 - Passwords hashed with scrypt at an OWASP-recommended cost; the cost is recorded in each hash, so it can be raised later and older hashes upgrade themselves on the next sign-in
 - Failed password sign-ins back off **per account**, not per IP address, so the limit can't be dodged by changing addresses. The wait is capped, forgotten after an hour, and never applies to Plex, SSO or passkey sign-in — there's always another way in
-- Sessions in signed, HTTP-only, SameSite cookies (Secure over TLS)
+- Sessions in signed, HTTP-only, SameSite cookies, marked `Secure` from the configured app URL rather than a header a proxy might not send
 - Rate limiting on all credential endpoints; security headers via Helmet, including a Content-Security-Policy
 - Changes requested from another site's page (votes included) are refused, based on the browser's `Sec-Fetch-Site` header
 - Media-server tokens/keys never reach the browser — posters proxy through the server

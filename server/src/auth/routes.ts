@@ -12,7 +12,7 @@ import { logger } from '../logger.js';
 import { buildAuthUrl, checkLoginPin, createLoginPin, getPlexAccount, getServerAccessToken } from '../plex/plextv.js';
 import { getAppUrl, getPlexConfig, registrationOpen } from '../settings.js';
 import { hashPassword, needsRehash, verifyPassword } from './passwords.js';
-import { createSession, destroySession, idleMinutes, requireUser, revokeOtherSessions } from './plugin.js';
+import { cookieSecure, createSession, destroySession, idleMinutes, requireUser, revokeOtherSessions } from './plugin.js';
 import { recordFailure, recordSuccess, retryAfterSeconds, type ThrottleProvider } from './throttle.js';
 import { uniqueUsername, usernameIs, usernameTaken } from './usernames.js';
 
@@ -172,7 +172,8 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   // OIDC step 1: stash PKCE/state in a short-lived signed cookie and redirect to the provider.
-  app.get('/api/auth/oidc/start', async (_request, reply) => {
+  // Rate-limited like the credential endpoints: each call has the server fetch the provider's discovery document.
+  app.get('/api/auth/oidc/start', { config: AUTH_RATE }, async (_request, reply) => {
     const fail = (message: string) => reply.redirect(`/login?oidcError=${encodeURIComponent(message)}`);
     if (userCount() === 0) return fail('Complete first-run setup first');
     try {
@@ -194,6 +195,7 @@ export async function authRoutes(app: FastifyInstance) {
         httpOnly: true,
         sameSite: 'lax',
         signed: true,
+        secure: cookieSecure(reply.request),
         maxAge: 600,
       });
       return reply.redirect(authUrl.href);
@@ -203,7 +205,7 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   // OIDC step 2: the provider redirects back here with a code; exchange and sign in.
-  app.get('/api/auth/oidc/callback', async (request, reply) => {
+  app.get('/api/auth/oidc/callback', { config: AUTH_RATE }, async (request, reply) => {
     const fail = (message: string) => reply.redirect(`/login?oidcError=${encodeURIComponent(message)}`);
     try {
       const raw = request.cookies['marquee_oidc'];
@@ -305,19 +307,22 @@ export async function authRoutes(app: FastifyInstance) {
     if (userCount() === 0) return reply.code(400).send({ error: 'Complete first-run setup before signing in with Plex' });
     try {
       const pin = await createLoginPin();
-      const origin = getAppUrl() ?? `${request.protocol}://${request.headers.host}`;
+      // plex.tv only sends the popup back to the app URL — a Host-derived
+      // address would go wherever the request claimed to be for. Without one,
+      // plex.tv shows its own confirmation and this tab's polling finishes the sign-in.
+      const appUrl = getAppUrl();
       reply.setCookie(PLEX_PIN_COOKIE, String(pin.id), {
         path: '/api/auth/plex',
         httpOnly: true,
         sameSite: 'lax',
         signed: true,
-        secure: request.protocol === 'https',
+        secure: cookieSecure(request),
         maxAge: PLEX_PIN_COOKIE_MAX_AGE,
       });
       // The code is shown beside the Plex button so the person approving can
       // match it against plex.tv's: a PIN flow can't otherwise tell an approval
       // they meant from one someone else's link talked them into.
-      return { pinId: pin.id, code: pin.code, authUrl: buildAuthUrl(pin.code, `${origin}/login?plexDone=1`) };
+      return { pinId: pin.id, code: pin.code, authUrl: buildAuthUrl(pin.code, appUrl ? `${appUrl}/login?plexDone=1` : undefined) };
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : 'Could not reach plex.tv' });
     }

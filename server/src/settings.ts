@@ -69,10 +69,19 @@ export function registrationOpen(): boolean {
   return getSetting('auth.allowRegistration') === 'true';
 }
 
-// The public URL people reach Marquee at (set in Admin), without a trailing slash.
+// The public URL people reach Marquee at (set in Admin), without a trailing
+// slash; null when unset or unusable. It's the one address for this instance
+// no request header can influence, so passkey origins, the Plex return link and
+// the Secure cookie flag come from here rather than from Host.
 export function getAppUrl(): string | null {
-  const url = getSetting('app.url');
-  return url ? trimTrailingSlashes(url) : null;
+  const raw = getSetting('app.url')?.trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? trimTrailingSlashes(url.href) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function getPlexConfig(): { url: string; token: string } | null {
