@@ -95,7 +95,7 @@ Open the app, create the first admin account, then in **Admin → Media servers*
 | `DATABASE_PATH` | `$DATA_DIR/marquee.db` | SQLite file location |
 | `SESSION_SECRET` | auto-generated, persisted in `$DATA_DIR` | Cookie signing + secrets-at-rest key |
 | `LOG_LEVEL` | `info` (prod) / `debug` (dev) | `trace`–`error` |
-| `TRUST_PROXY` | private networks | Which reverse proxies to trust for `X-Forwarded-*` (client IP for rate limits, https detection). The default trusts proxies on loopback/private addresses — a proxy on the same host, Docker network or LAN — and works unchanged when the server is exposed directly. Set a comma-separated IP/CIDR list to trust other proxies, e.g. add [Cloudflare's ranges](https://www.cloudflare.com/ips/) when it sits in front of your proxy. Hop counts are no longer supported. Avoid `true`: it trusts the whole header, letting clients spoof their IP. |
+| `TRUST_PROXY` | private networks | Which reverse proxies to trust for `X-Forwarded-*` (client IP for rate limits, https detection). The default trusts proxies on loopback/private addresses — a proxy on the same host, Docker network or LAN — and works unchanged when the server is exposed directly. **Pin it to your proxy if you can** — see [Pinning `TRUST_PROXY`](#pinning-trust_proxy). Hop counts are no longer supported, and a value that isn't IPs, CIDRs or keywords falls back to the default with an error in the log. Avoid `true`: it trusts the whole header, letting any client spoof its IP. |
 | `ADMIN_IDLE_MINUTES` | `120` | Minutes of inactivity before an **admin** session is auto-logged-out |
 | `USER_IDLE_MINUTES` | `360` | Minutes of inactivity before a regular **user** session is auto-logged-out |
 | `TZ` | `UTC` (Docker) | Time zone for daily library syncs and scheduled randomizer picks, e.g. `America/New_York` |
@@ -103,6 +103,27 @@ Open the app, create the first admin account, then in **Admin → Media servers*
 Everything else — media servers, Trakt, TMDb, Discord, request services, OIDC, the public app URL — is configured in the Admin UI, not env vars.
 
 > **Set the public app URL** (Admin → Integrations) on any instance people reach by a name. Passkeys only work once it's set, Sign in with Plex returns there, OIDC needs it for the redirect URI, and when it's `https` session cookies are always marked `Secure` — even if your proxy forgets `X-Forwarded-Proto`. Marquee then expects to be used at that address: with an `https` app URL, signing in over plain `http` (say, by LAN IP) won't keep you signed in.
+
+### Pinning `TRUST_PROXY`
+
+Marquee works out the client's IP address from `X-Forwarded-For`, believing that header only from proxies in `TRUST_PROXY`. The default (`loopback,linklocal,uniquelocal`) trusts any proxy on a loopback or private address — where a self-hosted Traefik, nginx, Caddy or SWAG lives — so it works out of the box, including with no proxy at all.
+
+The catch: trusting a whole class of addresses rather than one means a client reaching Marquee through such a proxy (or from your LAN) can put whatever it likes in `X-Forwarded-For` and have that become its address. Per-IP rate limits and the per-network guest-vote cap can then be sidestepped. Password guessing and ballot stuffing have limits that don't use the IP at all (see [Security](#security)), so this weakens a control rather than opening a door — but pinning it to the address your proxy connects from closes the gap. Marquee logs a warning at startup while it's loose.
+
+```yaml
+# Traefik and Marquee on the same Docker network: trust that subnet only.
+# `docker network inspect <network> --format '{{(index .IPAM.Config 0).Subnet}}'`
+environment:
+  - TRUST_PROXY=172.18.0.0/16
+
+# Proxy on the same host, talking to Marquee over localhost:
+  - TRUST_PROXY=loopback
+
+# Cloudflare in front of your own proxy: list both.
+  - TRUST_PROXY=172.18.0.0/16,173.245.48.0/20,103.21.244.0/22   # …and the rest of https://www.cloudflare.com/ips/
+```
+
+Pick the narrowest setting that still works: a single address (`10.0.0.5`) beats a subnet, and a subnet beats the default. If sign-ins start failing after a change, check that Marquee logs plausible client addresses rather than your proxy's — with nothing trusted, everyone shares the proxy's address and one person's failed logins rate-limit the household.
 
 ### Integrations (all optional)
 
@@ -191,6 +212,7 @@ curl -H "Authorization: Bearer $KEY" "https://marquee.example.com/api/widget/pol
 - Passwords hashed with scrypt at an OWASP-recommended cost; the cost is recorded in each hash, so it can be raised later and older hashes upgrade themselves on the next sign-in
 - Failed password sign-ins back off **per account**, not per IP address, so the limit can't be dodged by changing addresses. The wait is capped, forgotten after an hour, and never applies to Plex, SSO or passkey sign-in — there's always another way in
 - Sessions in signed, HTTP-only, SameSite cookies, marked `Secure` from the configured app URL rather than a header a proxy might not send
+- Public poll links cap guest votes per network *and* per poll, so a shared link can't be stuffed
 - Rate limiting on all credential endpoints; security headers via Helmet, including a Content-Security-Policy
 - Changes requested from another site's page (votes included) are refused, based on the browser's `Sec-Fetch-Site` header
 - Media-server tokens/keys never reach the browser — posters proxy through the server

@@ -125,3 +125,53 @@ test('closing picks the most-voted title', async () => {
   const vote = await member('POST', `/api/polls/${friday.shareToken}/vote`, { optionId: friday.options[1]!.id });
   assert.equal(vote.status, 409);
 });
+
+test('guest votes are capped per network and per poll', async () => {
+  const sunday = (
+    await admin<PollDetail>('POST', '/api/polls', { title: 'Sunday', mediaIds: [byTitle.Aliens, byTitle.Arrival], openNow: true })
+  ).data;
+  const link = `/api/public/polls/${(await admin<PollDetail>('POST', `/api/polls/${sunday.shareToken}/public`, { enabled: true })).data.publicToken}`;
+  const optionId = sunday.options[0]!.id;
+  const vote = (name: string, remoteAddress: string) =>
+    m.app.inject({ method: 'POST', url: `${link}/vote`, payload: { optionId, name }, remoteAddress });
+
+  for (let i = 1; i <= 10; i++) assert.equal((await vote(`Housemate ${i}`, '203.0.113.7')).statusCode, 200, `guest ${i}`);
+  let r = await vote('Housemate 11', '203.0.113.7');
+  assert.equal(r.statusCode, 429);
+  assert.match(r.json().error, /from your network/);
+  assert.equal((await vote('Neighbour', '198.51.100.7')).statusCode, 200, 'another network still votes');
+
+  // Fill the poll up to its guest ceiling directly, then try once more from a fresh network.
+  const sq = m.db.$client;
+  const pollId = sunday.id;
+  sq.transaction(() => {
+    for (let i = 0; i < 189; i++) {
+      const userId = sq.prepare("insert into users (username, guest_id, is_admin, created_at) values (?, ?, 0, 0) returning id").get(`filler-${i}`, `filler-${i}`) as { id: number };
+      sq.prepare('insert into votes (poll_id, option_id, user_id, voter_name, voter_network, created_at) values (?, ?, ?, ?, ?, 0)').run(pollId, optionId, userId.id, `Filler ${i}`, `net-${i}`);
+    }
+  })();
+  r = await vote('Latecomer', '192.0.2.99');
+  assert.equal(r.statusCode, 429);
+  assert.match(r.json().error, /all the guest votes/);
+  assert.equal((await member('POST', `/api/polls/${sunday.shareToken}/vote`, { optionId })).status, 200, 'members can still vote');
+});
+
+test('one account can only hold a few live result streams open', async () => {
+  const address = await m.app.listen({ port: 0, host: '127.0.0.1' });
+  const login = await fetch(`${address}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: 'Admin', password: 'password123' }),
+  });
+  const cookie = login.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+  const controller = new AbortController();
+  const open = () => fetch(`${address}/api/polls/${friday.shareToken}/events`, { headers: { cookie }, signal: controller.signal });
+  try {
+    const streams = [];
+    for (let i = 0; i < 8; i++) streams.push(await open());
+    assert.ok(streams.every((s) => s.status === 200));
+    assert.equal((await open()).status, 429);
+  } finally {
+    controller.abort();
+  }
+});

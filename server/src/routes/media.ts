@@ -69,6 +69,24 @@ function posterWidth(requested: unknown): number {
   return POSTER_WIDTHS.find((w) => w >= n) ?? POSTER_WIDTHS[POSTER_WIDTHS.length - 1];
 }
 
+const BACKDROP_POOL_SIZE = 12;
+const BACKDROP_POOL_TTL_MS = 6 * 60 * 60 * 1000;
+let backdrop: { items: { source: (typeof media.$inferSelect)['source']; thumb: string | null }[]; expiresAt: number } | null = null;
+
+function backdropPool() {
+  if (backdrop && backdrop.expiresAt > Date.now()) return backdrop.items;
+  const items = db
+    .select({ source: media.source, thumb: media.thumb })
+    .from(media)
+    .where(and(isNotNull(media.thumb), isNull(media.removedAt)))
+    .orderBy(sql`random()`)
+    .limit(BACKDROP_POOL_SIZE)
+    .all();
+  // Never keep an empty sample: the first sync shouldn't have to wait it out.
+  if (items.length) backdrop = { items, expiresAt: Date.now() + BACKDROP_POOL_TTL_MS };
+  return items;
+}
+
 // Poster proxy: streams artwork from the source server so tokens/keys stay server-side.
 export async function streamPoster(
   item: { source: 'plex' | 'jellyfin' | 'emby'; thumb: string | null },
@@ -198,22 +216,12 @@ export async function mediaRoutes(app: FastifyInstance) {
   // Unauthenticated: a random poster for the login-page backdrop. Streams
   // artwork only — no titles or metadata leave the server. Rate-limited because
   // it is pre-auth and drives a token-bearing request to the internal media server.
+  // Drawn from a small sample that changes every few hours, so nobody can page
+  // through the whole library's artwork without signing in.
   app.get('/api/backdrop', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (_request, reply) => {
-    // One random row, chosen by position, rather than loading every poster path.
-    const withArt = and(isNotNull(media.thumb), isNull(media.removedAt));
-    const count = db.select({ n: sql<number>`count(*)` }).from(media).where(withArt).get()!.n;
-    const row =
-      count > 0
-        ? db
-            .select({ source: media.source, thumb: media.thumb })
-            .from(media)
-            .where(withArt)
-            .limit(1)
-            .offset(crypto.randomInt(count))
-            .get()
-        : undefined;
-    if (!row) return reply.code(404).send({ error: 'No artwork yet' });
+    const pool = backdropPool();
+    if (!pool.length) return reply.code(404).send({ error: 'No artwork yet' });
     // The login page's backdrop tiles are small and faded.
-    return streamPoster(row, reply, 'no-store', POSTER_WIDTHS[0]);
+    return streamPoster(pool[crypto.randomInt(pool.length)]!, reply, 'no-store', POSTER_WIDTHS[0]);
   });
 }

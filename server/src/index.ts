@@ -1,4 +1,4 @@
-import { config } from './config.js';
+import { config, warnIfProxyTrustIsLoose } from './config.js';
 import { runIntegrityCheck } from './db/health.js';
 import { closeDatabase, runMigrations } from './db/index.js';
 import { buildApp } from './app.js';
@@ -7,6 +7,7 @@ import { startScheduler } from './scheduler.js';
 import { migrateSecretsAtRest } from './settings.js';
 import { startUpdateChecker } from './updates.js';
 
+warnIfProxyTrustIsLoose();
 runMigrations();
 migrateSecretsAtRest();
 // Surface database damage on the admin page from the first request.

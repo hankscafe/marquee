@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { and, desc, eq, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
@@ -13,6 +13,25 @@ import { castVote, optionsWithVotes } from '../polls/votes.js';
 
 // Posting to Discord speaks as the bot in a shared channel, so keep it slow.
 const DISCORD_POST_RATE = { rateLimit: { max: 10, timeWindow: '1 minute' } };
+
+// A live-results stream stays open as long as the client keeps it, so a rate
+// limit (requests per minute) doesn't bound how many one account holds.
+// Enough for a few tabs on a few devices.
+const MAX_STREAMS_PER_USER = 8;
+const streamsPerUser = new Map<number, number>();
+
+// Reserve a stream for this user until the request closes; false when they're at the cap.
+function holdStreamSlot(request: FastifyRequest, userId: number): boolean {
+  const open = streamsPerUser.get(userId) ?? 0;
+  if (open >= MAX_STREAMS_PER_USER) return false;
+  streamsPerUser.set(userId, open + 1);
+  request.raw.on('close', () => {
+    const left = (streamsPerUser.get(userId) ?? 1) - 1;
+    if (left > 0) streamsPerUser.set(userId, left);
+    else streamsPerUser.delete(userId);
+  });
+  return true;
+}
 
 const createPollSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
@@ -289,6 +308,9 @@ export async function pollRoutes(app: FastifyInstance) {
     const poll = pollByToken(token);
     if (!poll || (poll.status === 'draft' && !canManage(poll, request.user!))) {
       return reply.code(404).send({ error: 'Poll not found' });
+    }
+    if (!holdStreamSlot(request, request.user!.id)) {
+      return reply.code(429).send({ error: 'Too many live result streams open — close a tab and try again' });
     }
     streamPollEvents(request, reply, token);
   });

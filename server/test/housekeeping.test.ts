@@ -88,3 +88,18 @@ test('changes requested by another site’s page are refused', async () => {
   assert.equal((await admin('POST', '/api/lists', { name: 'Script' })).status, 201, 'no header: not a browser');
   assert.equal((await admin('GET', '/api/lists', undefined, cross)).status, 200, 'reads are fine');
 });
+
+test('a TRUST_PROXY that isn’t addresses falls back instead of breaking every request', async () => {
+  const { parseTrustProxy } = await import('../src/config.js');
+  const fallback = 'loopback,linklocal,uniquelocal';
+  assert.equal(parseTrustProxy(undefined), fallback);
+  assert.equal(parseTrustProxy('true'), true);
+  assert.equal(parseTrustProxy('false'), false);
+  assert.equal(parseTrustProxy('2'), fallback, 'hop counts');
+  assert.equal(parseTrustProxy(' 172.18.0.0/16 , loopback '), '172.18.0.0/16,loopback');
+  assert.equal(parseTrustProxy('10.0.0.0/255.0.0.0'), '10.0.0.0/255.0.0.0');
+  assert.equal(parseTrustProxy('fd00::/8'), 'fd00::/8');
+  assert.equal(parseTrustProxy('traefik'), fallback, 'a hostname');
+  assert.equal(parseTrustProxy('10.0.0.1/8/9'), fallback);
+  assert.equal(parseTrustProxy(','), fallback);
+});
