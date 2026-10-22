@@ -352,6 +352,32 @@ export interface RandomFilters {
   yearFrom?: number;
   yearTo?: number;
   minRating?: number;
+  // Narrow the draw to titles similar to what the person watched most recently
+  // (see SimilarToRecentStatus).
+  similarToRecent?: boolean;
+  recentSeedCount?: number; // how many recent titles to seed from, 1-10
+}
+
+// Why "like what I've been watching" did or didn't narrow the draw. Anything
+// but 'applied' means the spin used the other filters alone — it never fails
+// because of this.
+export type SimilarToRecentStatus =
+  | 'applied'
+  | 'no-history' // nothing recent to seed from: no dated watches, or none with a TMDb id
+  | 'not-configured' // neither a TMDb key nor Overseerr/Jellyseerr is set up
+  | 'unsupported' // only Ombi, which can't suggest similar titles
+  | 'unavailable' // TMDb or the request service errored or timed out
+  | 'no-matches'; // nothing suggested is in the library (or passed the other filters)
+
+export interface SimilarToRecentInfo {
+  status: SimilarToRecentStatus;
+  seedCount: number; // recent titles the suggestions came from
+  matchCount: number; // library titles left after narrowing
+}
+
+// POST /api/media/random. similarToRecent is there only when that filter was asked for.
+export interface RandomPick extends MediaItem {
+  similarToRecent?: SimilarToRecentInfo;
 }
 
 export interface ScheduledPickInfo {

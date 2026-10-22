@@ -117,6 +117,23 @@ export async function canRequest(who: Requester): Promise<boolean> {
   }
 }
 
+// The same lists via Overseerr/Jellyseerr, which pass TMDb's through — for
+// installs without a TMDb key. Ombi has no equivalent; callers check cfg.kind.
+export async function similarTmdbIds(cfg: SeerrConfig, type: 'movie' | 'tv', tmdbId: number): Promise<number[]> {
+  const found = new Set<number>();
+  for (const list of ['recommendations', 'similar'] as const) {
+    const res = await fetch(serverUrl(cfg.url, `api/v1/${type}/${tmdbId}/${list}`), {
+      headers: { ...keyHeader(cfg), Accept: 'application/json' },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`The request service responded ${res.status} while looking up ${list}`);
+    for (const result of ((await res.json()) as { results?: { id?: number }[] }).results ?? []) {
+      if (typeof result.id === 'number') found.add(result.id);
+    }
+  }
+  return [...found];
+}
+
 export async function requestMovie(cfg: SeerrConfig, tmdbId: number, asSeerrUser: number | null): Promise<void> {
   const target = serverUrl(cfg.url, cfg.kind === 'ombi' ? 'api/v1/Request/movie' : 'api/v1/request');
   const body = cfg.kind === 'ombi' ? { theMovieDbId: tmdbId } : { mediaType: 'movie', mediaId: tmdbId };

@@ -16,6 +16,7 @@ import { getAppUrl, getPlexConfig, getSetting, registrationOpen, setSetting } fr
 import { isSyncRunning, runLibrarySync } from '../sources/index.js';
 import { syncStatus } from '../sources/syncSchedule.js';
 import { getScanState, startFranchiseScan } from '../tmdb/scan.js';
+import { clearSuggestionCache } from '../randomizer/similar.js';
 
 export async function adminRoutes(app: FastifyInstance) {
   app.get('/api/admin/stats', { preHandler: requireAdmin }, async () => {
@@ -155,6 +156,8 @@ export async function adminRoutes(app: FastifyInstance) {
     if (parsed.data.seerrKind) setSetting('seerr.kind', parsed.data.seerrKind);
     // A different request service (or key) has different users.
     if (parsed.data.seerrUrl || parsed.data.seerrApiKey || parsed.data.seerrKind) clearSeerrUserCache();
+    // …and either may change where "like what I've been watching" gets its suggestions.
+    if (parsed.data.seerrUrl || parsed.data.seerrApiKey || parsed.data.seerrKind || parsed.data.tmdbApiKey) clearSuggestionCache();
     if (parsed.data.allowRegistration !== undefined) {
       setSetting('auth.allowRegistration', String(parsed.data.allowRegistration));
     }

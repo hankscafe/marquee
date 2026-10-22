@@ -5,7 +5,7 @@ import { media, users } from '../db/schema.js';
 import { getSectionItems, getSections, isWatchedOnPlex } from '../plex/client.js';
 import { getServerAccessToken } from '../plex/plextv.js';
 import { getPlexConfig } from '../settings.js';
-import { getWatchedSet } from '../trakt/service.js';
+import { getRecentWatchedIds, getWatchedSet } from '../trakt/service.js';
 
 // Per-person watch history, best source available:
 //   1. Trakt (user connected their account)
@@ -13,12 +13,16 @@ import { getWatchedSet } from '../trakt/service.js';
 //   3. The sync account's watch flags (last resort)
 export type WatchedMethod = 'trakt' | 'plex' | 'sync-account';
 
-const plexWatchedCache = new Map<number, { at: number; set: Set<number> }>();
+// A person's own Plex history: media id → when they last watched it (epoch
+// ms), or null when Plex didn't say.
+type PlexWatched = Map<number, number | null>;
+
+const plexWatchedCache = new Map<number, { at: number; watched: PlexWatched }>();
 const CACHE_MS = 5 * 60_000;
 
-async function plexWatchedSet(userId: number, plexToken: string): Promise<Set<number> | null> {
+async function plexWatched(userId: number, plexToken: string): Promise<PlexWatched | null> {
   const cached = plexWatchedCache.get(userId);
-  if (cached && Date.now() - cached.at < CACHE_MS) return cached.set;
+  if (cached && Date.now() - cached.at < CACHE_MS) return cached.watched;
   const cfg = getPlexConfig();
   if (!cfg) return null;
 
@@ -29,7 +33,7 @@ async function plexWatchedSet(userId: number, plexToken: string): Promise<Set<nu
     .all();
   const byKey = new Map(rows.map((r) => [r.ratingKey, r.id]));
 
-  const set = new Set<number>();
+  const watched: PlexWatched = new Map();
   try {
     // Same server, but queried with the user's token, so UserData is theirs.
     // Shared users need their per-server token — the server rejects their account token.
@@ -43,29 +47,56 @@ async function plexWatchedSet(userId: number, plexToken: string): Promise<Set<nu
       for (const item of items) {
         if (!isWatchedOnPlex(item)) continue;
         const id = byKey.get(item.ratingKey);
-        if (id) set.add(id);
+        if (id) watched.set(id, item.lastViewedAt ? item.lastViewedAt * 1000 : null);
       }
     }
   } catch {
     return null; // their token may have expired — fall through to the next method
   }
 
-  plexWatchedCache.set(userId, { at: Date.now(), set });
-  return set;
+  plexWatchedCache.set(userId, { at: Date.now(), watched });
+  return watched;
+}
+
+function ownPlexToken(userId: number): string | null {
+  const user = db.select({ plexToken: users.plexToken }).from(users).where(eq(users.id, userId)).get();
+  return user?.plexToken ? decryptSecret(user.plexToken) : null;
 }
 
 export async function watchedSetForUser(userId: number): Promise<{ set: Set<number>; method: WatchedMethod }> {
   const traktSet = getWatchedSet(userId);
   if (traktSet) return { set: traktSet, method: 'trakt' };
 
-  const user = db.select({ plexToken: users.plexToken }).from(users).where(eq(users.id, userId)).get();
-  if (user?.plexToken) {
-    const set = await plexWatchedSet(userId, decryptSecret(user.plexToken));
-    if (set) return { set, method: 'plex' };
+  const token = ownPlexToken(userId);
+  if (token) {
+    const watched = await plexWatched(userId, token);
+    if (watched) return { set: new Set(watched.keys()), method: 'plex' };
   }
 
   const rows = db.select({ id: media.id }).from(media).where(eq(media.watched, true)).all();
   return { set: new Set(rows.map((r) => r.id)), method: 'sync-account' };
+}
+
+// Up to `limit` media ids the person watched most recently, newest first, from
+// the same sources in the same order as watchedSetForUser. The sync account's
+// flags carry no times, so without Trakt or Plex history there's nothing to give.
+export async function recentlyWatchedForUser(userId: number, limit: number): Promise<{ mediaIds: number[]; method: WatchedMethod }> {
+  const fromTrakt = getRecentWatchedIds(userId, limit);
+  if (fromTrakt.length) return { mediaIds: fromTrakt, method: 'trakt' };
+
+  const token = ownPlexToken(userId);
+  if (token) {
+    const watched = await plexWatched(userId, token);
+    if (watched) {
+      const mediaIds = [...watched]
+        .filter((entry): entry is [number, number] => entry[1] !== null)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([id]) => id);
+      return { mediaIds, method: 'plex' };
+    }
+  }
+  return { mediaIds: [], method: 'sync-account' };
 }
 
 // plex.tv Discover watchlist for one account.

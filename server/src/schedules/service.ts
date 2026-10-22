@@ -24,7 +24,7 @@ export async function runSchedule(
 ): Promise<typeof media.$inferSelect | null> {
   // An unattended schedule draws only from lists its creator personally owns
   // or that are shared — never via admin override in a background job.
-  const pick = await pickRandomMedia(parseFilters(row), { id: row.createdBy, isAdmin: false });
+  const { pick } = await pickRandomMedia(parseFilters(row), { id: row.createdBy, isAdmin: false });
   db.update(scheduledPicks)
     .set({
       lastRunAt: now,

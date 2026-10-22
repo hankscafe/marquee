@@ -54,8 +54,17 @@ export async function startMocks() {
       { ratingKey: '201', title: 'Severance', year: 2022, type: 'show', thumb: '/library/metadata/201/thumb/1', leafCount: 19, viewedLeafCount: 19, Guid: [{ id: 'tmdb://95396' }] },
       { ratingKey: '202', title: 'Andor', year: 2022, type: 'show', thumb: '/library/metadata/202/thumb/1', leafCount: 24, viewedLeafCount: 3 },
     ] as PlexItem[],
-    // A shared user's view of the server: their own watch history.
+    // A shared user's view of the server: their own watch history, and when
+    // they last watched each (epoch seconds) — Aliens most recently.
     sharedUserWatched: new Set(['101', '102']),
+    sharedUserLastViewed: { '101': 1_700_000_000, '102': 1_760_000_000 } as Record<string, number>,
+    // What TMDb (and Overseerr/Jellyseerr, passing it through) suggests for a
+    // title, keyed "movie:<tmdb id>" or "tv:<tmdb id>".
+    similar: {
+      'movie:679': [329865, 348, 95396, 424242], // Aliens → Arrival, Alien, a *show* id, something not in the library
+      'movie:348': [438631], // Alien → Dune
+    } as Record<string, number[]>,
+    seerrDown: false,
     // The plex.tv account token a sign-in PIN hands over once approved.
     pinToken: 'shared-plex-token',
     // plex.tv watchlists by account token: the owner's runs to two pages.
@@ -78,6 +87,7 @@ export async function startMocks() {
     discover: [] as string[],
     trakt: [] as string[],
     ombi: [] as { path: string; apiKey: string | null; xApiKey: string | null }[],
+    overseerr: [] as string[],
   };
 
   // Plex Media Server. The owner's token sees the sync account's history; a
@@ -95,7 +105,11 @@ export async function startMocks() {
     if (p === '/library/sections/1/all') {
       const movies =
         token === 'shared-server-token'
-          ? data.plexMovies.map((m) => ({ ...m, viewCount: data.sharedUserWatched.has(m.ratingKey) ? 1 : 0 }))
+          ? data.plexMovies.map((m) =>
+              data.sharedUserWatched.has(m.ratingKey)
+                ? { ...m, viewCount: 1, lastViewedAt: data.sharedUserLastViewed[m.ratingKey] }
+                : { ...m, viewCount: 0 },
+            )
           : data.plexMovies;
       return json(res, { MediaContainer: { Metadata: movies } });
     }
@@ -157,6 +171,12 @@ export async function startMocks() {
     if (req.headers['x-api-key'] !== 'seerr-key') return json(res, {}, 401);
     if (url.pathname === '/api/v1/settings/main') return json(res, { applicationTitle: 'Overseerr' });
     if (url.pathname === '/api/v1/user') return json(res, { results: [] });
+    const similar = /^\/api\/v1\/(movie|tv)\/(\d+)\/(recommendations|similar)$/.exec(url.pathname);
+    if (similar) {
+      requests.overseerr.push(url.pathname);
+      if (data.seerrDown) return json(res, {}, 500);
+      return json(res, { results: (data.similar[`${similar[1]}:${similar[2]}`] ?? []).map((id) => ({ id })) });
+    }
     json(res, {}, 404);
   });
 
@@ -181,6 +201,8 @@ export async function startMocks() {
     if (url.searchParams.get('api_key') !== 'tmdb-key') return json(res, { status_message: 'Invalid API key' }, 401);
     const alien = { id: 8091, name: 'Alien Collection', poster_path: '/a.jpg' };
     const movies: Record<string, object | null> = { 348: alien, 679: alien, 438631: { id: 726871, name: 'Dune Collection' }, 329865: null };
+    const similar = /^\/3\/(movie|tv)\/(\d+)\/(recommendations|similar)$/.exec(url.pathname);
+    if (similar) return json(res, { results: (data.similar[`${similar[1]}:${similar[2]}`] ?? []).map((id) => ({ id })) });
     let m = /^\/3\/movie\/(\d+)$/.exec(url.pathname);
     if (m) return m[1]! in movies ? json(res, { id: Number(m[1]), belongs_to_collection: movies[m[1]!] }) : json(res, {}, 404);
     m = /^\/3\/collection\/(\d+)$/.exec(url.pathname);
@@ -228,8 +250,13 @@ export async function startMocks() {
     const url = new URL(req.url!, 'http://x');
     requests.trakt.push(url.pathname + url.search);
     if (req.headers.authorization !== 'Bearer trakt-token') return json(res, {}, 401);
-    if (url.pathname === '/sync/watched/movies') return json(res, [{ movie: { ids: { imdb: 'tt0090605' } } }, { movie: { ids: { imdb: 'tt7777777' } } }]);
-    if (url.pathname === '/sync/watched/shows') return json(res, [{ show: { ids: { tmdb: 95396 } } }]);
+    if (url.pathname === '/sync/watched/movies') {
+      return json(res, [
+        { last_watched_at: '2026-10-01T20:00:00.000Z', movie: { ids: { imdb: 'tt0090605' } } },
+        { last_watched_at: '2026-09-01T20:00:00.000Z', movie: { ids: { imdb: 'tt7777777' } } },
+      ]);
+    }
+    if (url.pathname === '/sync/watched/shows') return json(res, [{ last_watched_at: '2026-10-10T20:00:00.000Z', show: { ids: { tmdb: 95396 } } }]);
     json(res, {}, 404);
   });
 

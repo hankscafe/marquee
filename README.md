@@ -23,6 +23,8 @@ Poll cards show each option's poster sized by its share of the vote — front-ru
 
 Can't decide? Draw a random title from the whole library, a single library, a server collection, or a custom list — filtered by movie/show, genre, year range, minimum rating, and **your personal watch history**. Save any spin as a weekly or one-time schedule with optional Discord announcements.
 
+Tick **Like what I've been watching** and the draw narrows to library titles similar to your own last few watches. It needs dated watch history — Sign in with Plex, or Trakt — and suggestions from TMDb (if an admin added a key) or Overseerr/Jellyseerr. When any of that is missing, the spin still happens with your other filters and says why.
+
 ![Randomizer](docs/screenshots/randomizer.png)
 
 The pick is revealed in a modal — spin again right there until something sticks.
@@ -132,9 +134,9 @@ Pick the narrowest setting that still works: a single address (`10.0.0.5`) beats
 | **Plex** | Server URL + [X-Plex-Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) | Library sync, Sign in with Plex, user import, Watch With |
 | **Jellyfin / Emby** | Server URL + API key (dashboard) | Library sync, credential sign-in |
 | **Trakt** | Free [API app](https://trakt.tv/oauth/applications) (redirect URI `urn:ietf:wg:oauth:2.0:oob`) | Per-user watch history |
-| **TMDb** | Free [API key](https://www.themoviedb.org/settings/api) | Film-series scan + missing-title detection |
+| **TMDb** | Free [API key](https://www.themoviedb.org/settings/api) | Film-series scan + missing-title detection; suggestions for the randomizer's "like what I've been watching" |
 | **Discord** | Bot token + channel ID | Poll voting from Discord, winner announcements |
-| **Overseerr / Jellyseerr / Ombi** | Service URL + API key | One-click requests for missing titles. With Overseerr/Jellyseerr each request is made as the person's own account there (matched by Plex, Jellyfin or Emby sign-in), so its permissions and quotas apply; Ombi requests are admin-only |
+| **Overseerr / Jellyseerr / Ombi** | Service URL + API key | One-click requests for missing titles. With Overseerr/Jellyseerr each request is made as the person's own account there (matched by Plex, Jellyfin or Emby sign-in), so its permissions and quotas apply; Ombi requests are admin-only. Without a TMDb key, Overseerr/Jellyseerr also supply the randomizer's "like what I've been watching" suggestions |
 | **OIDC** | Issuer URL + client ID/secret | Single sign-on |
 
 ## Widget API

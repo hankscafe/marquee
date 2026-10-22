@@ -38,6 +38,17 @@ export interface TmdbPart {
   poster_path?: string | null;
 }
 
+// TMDb's "recommendations" and "similar" lists for one title, merged (the first
+// page of each — the strongest matches).
+export async function getSimilarIds(type: 'movie' | 'tv', tmdbId: number, key: string): Promise<number[]> {
+  const found = new Set<number>();
+  for (const list of ['recommendations', 'similar'] as const) {
+    const json = await tmdbGet<{ results?: { id?: number }[] }>(`${type}/${tmdbId}/${list}`, key);
+    for (const result of json.results ?? []) if (typeof result.id === 'number') found.add(result.id);
+  }
+  return [...found];
+}
+
 export async function getCollectionParts(collectionTmdbId: string, key: string): Promise<TmdbPart[]> {
   const json = await tmdbGet<{ parts?: TmdbPart[] }>(`collection/${collectionTmdbId}`, key);
   return json.parts ?? [];

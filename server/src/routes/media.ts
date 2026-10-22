@@ -25,6 +25,8 @@ export const randomFiltersSchema = z.object({
   yearFrom: z.number().int().optional(),
   yearTo: z.number().int().optional(),
   minRating: z.number().min(0).max(10).optional(),
+  similarToRecent: z.boolean().optional(),
+  recentSeedCount: z.number().int().min(1).max(10).optional(),
 });
 
 // Deep link into the source server's web app for this title.
@@ -199,11 +201,11 @@ export async function mediaRoutes(app: FastifyInstance) {
   app.post('/api/media/random', { preHandler: requireUser }, async (request, reply) => {
     const parsed = randomFiltersSchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
-    const pick = await pickRandomMedia(parsed.data, request.user!);
+    const { pick, similarToRecent } = await pickRandomMedia(parsed.data, request.user!);
     if (!pick) {
       return reply.code(404).send({ error: 'No titles match those filters. Try widening them or sync your library.' });
     }
-    return serializeMedia(pick);
+    return { ...serializeMedia(pick), ...(similarToRecent ? { similarToRecent } : {}) };
   });
 
   app.get('/api/media/:id/poster', { preHandler: requireUser }, async (request, reply) => {

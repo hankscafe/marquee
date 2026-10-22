@@ -93,7 +93,12 @@ export interface TraktIds {
   tmdb?: number | null;
 }
 
-export async function getWatched(clientId: string, token: string, type: 'movies' | 'shows'): Promise<TraktIds[]> {
+export interface TraktWatched {
+  ids: TraktIds;
+  lastWatchedAt: string | null; // ISO-8601
+}
+
+export async function getWatched(clientId: string, token: string, type: 'movies' | 'shows'): Promise<TraktWatched[]> {
   // Shows would otherwise come with every season and episode watched — only the ids are used.
   const query = type === 'shows' ? '?extended=noseasons' : '';
   const res = await fetch(`${TRAKT}/sync/watched/${type}${query}`, {
@@ -102,6 +107,9 @@ export async function getWatched(clientId: string, token: string, type: 'movies'
   });
   if (res.status === 401 || res.status === 403) throw new TraktAuthError('Trakt token rejected');
   if (!res.ok) throw new Error(`Trakt watched-${type} request failed (${res.status})`);
-  const json = (await res.json()) as ({ movie?: { ids?: TraktIds } } & { show?: { ids?: TraktIds } })[];
-  return json.map((entry) => (type === 'movies' ? entry.movie?.ids : entry.show?.ids) ?? {});
+  const json = (await res.json()) as { last_watched_at?: string | null; movie?: { ids?: TraktIds }; show?: { ids?: TraktIds } }[];
+  return json.map((entry) => ({
+    ids: (type === 'movies' ? entry.movie?.ids : entry.show?.ids) ?? {},
+    lastWatchedAt: entry.last_watched_at ?? null,
+  }));
 }
