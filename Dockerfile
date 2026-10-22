@@ -26,4 +26,7 @@ COPY --from=build /app/server/drizzle server/drizzle
 COPY --from=build /app/client/dist client/dist
 EXPOSE 3000
 VOLUME /data
+# Lets Docker (and Container Station) show the container as unhealthy if the API stops answering.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["node", "-e", "require('http').get('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
 CMD ["node", "server/dist/index.js"]
