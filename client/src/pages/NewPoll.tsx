@@ -165,7 +165,7 @@ export function NewPoll() {
           stateOf={(m) => (selected.some((s) => s.id === m.id) ? 'selected' : 'available')}
           onPick={toggle}
           onDetails={setDetailsId}
-          emptyText="Nothing found. Has an admin synced the Plex library yet?"
+          emptyText="Nothing found. Has an admin synced the library yet?"
         />
       </div>
 

@@ -84,7 +84,7 @@ services:
 docker compose up -d
 ```
 
-Open the app, create the first admin account, then in **Admin → Media servers** add your Plex/Jellyfin/Emby details and hit **Sync all libraries now** — then turn on **Automatic sync** so new titles keep showing up on their own. All state lives in `./data` — back up that folder and you've backed up everything.
+Open the app, create the first admin account, then in **Admin → Media servers** add your Plex/Jellyfin/Emby details, then in the **Library sync** card hit **Sync all libraries now** and turn on automatic sync so new titles keep showing up on their own. All state lives in `./data` — back up that folder and you've backed up everything.
 
 ## Configuration
 

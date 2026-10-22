@@ -314,7 +314,8 @@ export function Collections() {
         <div className="card p-8 text-center">
           <p className="font-display text-xl text-stone-300">No collections synced</p>
           <p className="mt-2 text-sm text-stone-400">
-            Collections come from Plex — create some there, then run a library sync from the Admin page.
+            Collections come from your media server — Plex collections or Jellyfin and Emby box sets. Create some
+            there, then run a library sync from the Admin page.
           </p>
         </div>
       )}

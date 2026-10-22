@@ -6,9 +6,9 @@ export const users = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     username: text('username').notNull(), // unique regardless of case (index below)
-    passwordHash: text('password_hash'), // null for Plex-authenticated accounts
+    passwordHash: text('password_hash'), // null for accounts that sign in another way (Plex, Jellyfin, SSO…)
     plexId: text('plex_id').unique(), // plex.tv account id, set for Plex-authenticated accounts
-    plexToken: text('plex_token'), // that account's token, kept for future Watch With / watchlist features
+    plexToken: text('plex_token'), // that account's token, for Watch With (their own watch history and watchlist)
     discordId: text('discord_id').unique(), // set for shadow accounts created by Discord button votes
     guestId: text('guest_id').unique(), // set for guest accounts created by votes on a public poll link
     jellyfinId: text('jellyfin_id').unique(), // set for Jellyfin-authenticated accounts
@@ -59,7 +59,7 @@ export const sessions = sqliteTable(
   (t) => [index('sessions_user_id_idx').on(t.userId)],
 );
 
-// Instance settings managed from the admin UI (Plex URL/token, future OIDC config).
+// Instance settings managed from the admin UI (media servers, integrations, sign-in options).
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
@@ -73,21 +73,23 @@ export const media = sqliteTable(
     source: text('source', { enum: ['plex', 'jellyfin', 'emby'] }).notNull().default('plex'),
     ratingKey: text('rating_key').notNull(),
     title: text('title').notNull(),
-  year: integer('year'),
-  type: text('type', { enum: ['movie', 'show'] }).notNull(),
-  thumb: text('thumb'),
-  summary: text('summary'),
-  durationMs: integer('duration_ms'),
-  librarySection: text('library_section'),
-  genres: text('genres'), // JSON array of genre names, e.g. ["Comedy","Horror"]
-  imdbId: text('imdb_id'), // external ids from Plex GUIDs, used to match against Trakt
-  tmdbId: text('tmdb_id'),
-  // Whether the TMDb franchise scan has already looked this movie up (avoids refetching).
-  tmdbCollectionChecked: integer('tmdb_collection_checked', { mode: 'boolean' }).notNull().default(false),
-  rating: real('rating'), // critic/audience rating from Plex, 0-10
-  contentRating: text('content_rating'), // e.g. PG-13, TV-MA
-  directors: text('directors'), // JSON array of names
-  actors: text('actors'), // JSON array of names
+    year: integer('year'),
+    type: text('type', { enum: ['movie', 'show'] }).notNull(),
+    thumb: text('thumb'), // artwork reference on its server (Plex path / Jellyfin or Emby item id)
+    summary: text('summary'),
+    durationMs: integer('duration_ms'),
+    librarySection: text('library_section'),
+    genres: text('genres'), // JSON array of genre names, e.g. ["Comedy","Horror"]
+    // External ids from the media server: match Trakt history and TMDb franchises,
+    // and link copies of one title across servers.
+    imdbId: text('imdb_id'),
+    tmdbId: text('tmdb_id'),
+    // Whether the TMDb franchise scan has already looked this movie up (avoids refetching).
+    tmdbCollectionChecked: integer('tmdb_collection_checked', { mode: 'boolean' }).notNull().default(false),
+    rating: real('rating'), // audience/community rating from the media server, 0-10
+    contentRating: text('content_rating'), // e.g. PG-13, TV-MA
+    directors: text('directors'), // JSON array of names
+    actors: text('actors'), // JSON array of names
     // Watch status as seen by the media-server account used for syncing.
     watched: integer('watched', { mode: 'boolean' }).notNull().default(false),
     // Set when a sync no longer finds the title on its server: hidden from search,

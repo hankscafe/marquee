@@ -59,7 +59,7 @@ export async function refreshUserWatched(userId: number): Promise<number> {
 }
 
 // The user's personal watched set, or null when they haven't connected Trakt
-// (callers then fall back to the Plex-account-level watched flag).
+// (callers then fall back to the sync account's watched flag).
 export function getWatchedSet(userId: number): Set<number> | null {
   const user = db.select({ traktToken: users.traktToken }).from(users).where(eq(users.id, userId)).get();
   if (!user?.traktToken) return null;

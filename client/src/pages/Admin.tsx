@@ -257,8 +257,9 @@ const SYNC_INTERVALS = [1, 3, 6, 12, 24];
 
 const formatWhen = (iso: string) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 
-// Unattended library sync, either every few hours or once a day at a set time.
-function AutoSyncCard() {
+// Library sync for every media server: run one now, or automatically — every
+// few hours or once a day at a set time.
+function LibrarySyncCard() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<SyncMode>('off');
   const [intervalHours, setIntervalHours] = useState(6);
@@ -290,16 +291,36 @@ function AutoSyncCard() {
     onError: (err) => setMsg(err instanceof ApiError ? `✗ ${err.message}` : '✗ Save failed'),
   });
 
+  const sync = useMutation({
+    mutationFn: () => api<SyncResult>('/api/admin/sync', { body: {} }),
+    onSuccess: (r) => {
+      const parts = r.results.map(
+        (s) => `${s.source}: ${s.items} titles, ${s.collections} collections${s.removed ? `, ${s.removed} no longer on the server` : ''}`,
+      );
+      const errors = r.errors.length ? ` — errors: ${r.errors.join('; ')}` : '';
+      setMsg(`✓ Synced ${parts.join(' · ')}${errors}`);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+    },
+    onError: (err) => setMsg(err instanceof ApiError ? `✗ ${err.message}` : '✗ Sync failed'),
+    // Either way, refresh the last/next sync times.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['admin', 'settings'] }),
+  });
+
   const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const next = settings?.nextSyncAt ? new Date(settings.nextSyncAt) : null;
 
   return (
     <section className="card space-y-4 p-5">
-      <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Automatic sync</h2>
+      <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Library sync</h2>
       <p className="text-sm text-stone-400">
-        Keep Marquee up to date with your media servers so new titles appear without anyone clicking Sync.
+        Brings in new titles and collections from every media server above. Turn on automatic sync so they appear
+        without anyone clicking Sync.
       </p>
+      <button className="btn btn-ghost" disabled={sync.isPending || settings?.syncRunning} onClick={() => sync.mutate()}>
+        {sync.isPending ? 'Syncing…' : 'Sync all libraries now'}
+      </button>
       <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-stone-300">Automatic sync</span>
         <select className="input w-auto" value={mode} onChange={(e) => setMode(e.target.value as SyncMode)}>
           <option value="off">Off</option>
           <option value="interval">Every few hours</option>
@@ -722,21 +743,6 @@ export function Admin() {
     onError,
   });
 
-  const sync = useMutation({
-    mutationFn: () => api<SyncResult>('/api/admin/sync', { body: {} }),
-    onSuccess: (r) => {
-      const parts = r.results.map(
-        (s) => `${s.source}: ${s.items} titles, ${s.collections} collections${s.removed ? `, ${s.removed} no longer on the server` : ''}`,
-      );
-      const errors = r.errors.length ? ` — errors: ${r.errors.join('; ')}` : '';
-      setMessage(`✓ Synced ${parts.join(' · ')}${errors}`);
-      queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
-    },
-    onError,
-    // Either way, refresh the automatic-sync card's last/next sync times.
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['admin', 'settings'] }),
-  });
-
   const resolveIssue = useMutation({
     mutationFn: ({ id, status }: { id: number; status: 'open' | 'resolved' }) =>
       api(`/api/admin/issues/${id}`, { method: 'PATCH', body: { status } }),
@@ -818,16 +824,13 @@ export function Admin() {
           <button className="btn btn-ghost" disabled={test.isPending} onClick={() => test.mutate()}>
             {test.isPending ? 'Testing…' : 'Test connection'}
           </button>
-          <button className="btn btn-ghost" disabled={sync.isPending} onClick={() => sync.mutate()}>
-            {sync.isPending ? 'Syncing…' : 'Sync all libraries now'}
-          </button>
         </div>
         {message && <p className="text-sm text-stone-300">{message}</p>}
       </section>
 
       <JfServerCard kind="jellyfin" savedUrl={settings?.jellyfinUrl} keySet={settings?.jellyfinKeySet} />
       <JfServerCard kind="emby" savedUrl={settings?.embyUrl} keySet={settings?.embyKeySet} />
-      <AutoSyncCard />
+      <LibrarySyncCard />
         </>
       )}
 

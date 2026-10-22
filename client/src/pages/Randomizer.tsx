@@ -15,8 +15,9 @@ function describeCadence(s: ScheduledPickInfo): string {
 
 type TypeFilter = 'all' | 'movie' | 'show';
 
-// Source encodes what to draw from: the whole library, one Plex library
-// section, one Plex collection, or one of the user's lists.
+// Source encodes what to draw from: the whole library, one library section,
+// one collection (a Plex collection or Jellyfin/Emby box set), or one of the
+// user's lists.
 type Source =
   | { kind: 'library' }
   | { kind: 'section'; name: string }
@@ -164,7 +165,7 @@ export function Randomizer() {
               </optgroup>
             )}
             {filters && filters.collections.length > 0 && (
-              <optgroup label="Plex collections">
+              <optgroup label="Collections">
                 {filters.collections.map((c) => (
                   <option key={c.id} value={`collection:${c.id}`}>
                     {c.title} ({c.itemCount})

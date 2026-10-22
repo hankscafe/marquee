@@ -15,7 +15,7 @@ export default defineConfig({
       manifest: {
         name: 'Marquee',
         short_name: 'Marquee',
-        description: 'Movie night polls and randomizer for your Plex server',
+        description: 'Movie night polls and randomizer for your Plex, Jellyfin or Emby server',
         theme_color: '#070b16',
         background_color: '#04070f',
         display: 'standalone',

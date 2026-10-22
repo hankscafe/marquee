@@ -7,7 +7,7 @@ import { getWatchedSet } from '../trakt/service.js';
 import { serializeMedia } from './media.js';
 
 // "Watched" is personal when the user has connected Trakt; otherwise it falls
-// back to the watch flag of the Plex account used for syncing.
+// back to the watch flag of the media-server account used for syncing.
 function isWatched(item: { id: number; watched: boolean }, watchedSet: Set<number> | null): boolean {
   return watchedSet ? watchedSet.has(item.id) : item.watched;
 }
