@@ -7,6 +7,7 @@ import { requireAdmin } from '../auth/plugin.js';
 import { runIntegrityCheck } from '../db/health.js';
 import { hashPassword } from '../auth/passwords.js';
 import { uniqueUsername, usernameTaken } from '../auth/usernames.js';
+import { getJfConfig, listJfUsers } from '../jellyfin/client.js';
 import { getFriends, getHomeUsers } from '../plex/plextv.js';
 import { pickWinner } from '../polls/service.js';
 import { getPlexConfig } from '../settings.js';
@@ -171,6 +172,47 @@ export async function adminUserRoutes(app: FastifyInstance) {
       }
       db.insert(users)
         .values({ username: uniqueUsername(candidate.name), passwordHash: null, plexId: candidate.plexId })
+        .run();
+      imported++;
+    }
+    return { imported, skipped };
+  });
+
+  // The Jellyfin/Emby counterpart, for households whose roster lives on those
+  // servers. People sign in later and are matched by their account id there —
+  // never by name, which would hand a Jellyfin "sam" a local "sam"'s account.
+  app.post('/api/admin/users/import/:kind', { preHandler: requireAdmin }, async (request, reply) => {
+    const { kind } = request.params as { kind: string };
+    if (kind !== 'jellyfin' && kind !== 'emby') return reply.code(404).send({ error: 'Unknown media server' });
+    if (!getJfConfig(kind)) return reply.code(503).send({ error: `${kind === 'jellyfin' ? 'Jellyfin' : 'Emby'} is not configured` });
+    // As with the Plex import: a damaged index would miss existing accounts and import everyone twice.
+    if (!runIntegrityCheck().ok) {
+      return reply.code(409).send({
+        error: 'The database check found problems, so importing is paused to avoid duplicate accounts — see the Admin overview',
+      });
+    }
+
+    let candidates: { id: string; name: string }[];
+    try {
+      candidates = await listJfUsers(kind);
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : `Could not reach ${kind}` });
+    }
+
+    const idColumn = kind === 'jellyfin' ? users.jellyfinId : users.embyId;
+    let imported = 0;
+    let skipped = 0;
+    for (const candidate of new Map(candidates.map((c) => [c.id, c])).values()) {
+      if (db.select({ id: users.id }).from(users).where(eq(idColumn, candidate.id)).get()) {
+        skipped++;
+        continue;
+      }
+      db.insert(users)
+        .values({
+          username: uniqueUsername(candidate.name),
+          passwordHash: null,
+          ...(kind === 'jellyfin' ? { jellyfinId: candidate.id } : { embyId: candidate.id }),
+        })
         .run();
       imported++;
     }

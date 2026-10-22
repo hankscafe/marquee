@@ -59,7 +59,7 @@ Post a poll to a channel and people vote with buttons — **no Marquee account n
 
 - **Media servers**: Plex, Jellyfin, and Emby — any combination at once, with cross-server de-duplication and automatic library sync (every few hours or daily at a set time). Titles removed from a server disappear from search and the randomizer but stay in past polls and lists, and come back if re-added
 - **Sign-in options**: local accounts, Sign in with Plex (popup PIN flow), Jellyfin/Emby credentials, OIDC (Authentik/Authelia/Keycloak/…), and passkeys (WebAuthn)
-- **User management**: create accounts, import your Plex Home members and friends in one click (safe to re-run as new people join), set/reset passwords (people can change their own on the Account page), promote admins, open registration to anyone (off by default). Usernames are case-insensitive — "Michael" and "michael" are the same account
+- **User management**: create accounts, import your Plex Home members and friends — or every account on your Jellyfin/Emby server — in one click (safe to re-run as new people join), set/reset passwords (people can change their own on the Account page), promote admins, open registration to anyone (off by default). Usernames are case-insensitive — "Michael" and "michael" are the same account
 - **Trakt**: users connect their own accounts for personal watch status everywhere
 - **Issue reports**: users flag problems to the admin in-app
 - **Database health**: a daily integrity check warns admins about database damage (see [Database health](#database-health))

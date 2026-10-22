@@ -146,3 +146,23 @@ test('passkeys, the Plex return link and Secure cookies come from the app URL al
   assert.equal(settings.data.oidcRedirectUri, null);
   assert.equal((await browser('POST', '/api/auth/passkey/options', {})).status, 503);
 });
+
+test('Jellyfin users can be imported ahead of their first sign-in', async () => {
+  const r = await admin<{ imported: number; skipped: number }>('POST', '/api/admin/users/import/jellyfin', {});
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  // admin is new; jfuser signed in earlier; the nameless account is left out.
+  assert.deepEqual(r.data, { imported: 1, skipped: 1 });
+  const again = await admin<{ imported: number; skipped: number }>('POST', '/api/admin/users/import/jellyfin', {});
+  assert.deepEqual(again.data, { imported: 0, skipped: 2 }, 'safe to run again');
+
+  // Matched by Jellyfin account id, never by name: the local "Admin" is untouched.
+  const rows = m.db.$client.prepare("select username, jellyfin_id as jf from users where jellyfin_id = 'u1' or lower(username) = 'admin'").all() as { username: string; jf: string | null }[];
+  assert.equal(rows.find((u) => u.username === 'Admin')?.jf, null);
+  assert.ok(rows.some((u) => u.jf === 'u1' && u.username !== 'Admin'));
+
+  assert.equal((await admin('POST', '/api/admin/users/import/emby', {})).status, 503);
+  assert.equal((await admin('POST', '/api/admin/users/import/plexish', {})).status, 404);
+  const member = m.client();
+  await member('POST', '/api/auth/login', { username: 'pat', password: 'second-password' });
+  assert.equal((await member('POST', '/api/admin/users/import/jellyfin', {})).status, 403);
+});

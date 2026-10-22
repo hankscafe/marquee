@@ -69,6 +69,17 @@ function UsersPanel() {
     onError,
   });
 
+  const importJf = useMutation({
+    mutationFn: (kind: 'jellyfin' | 'emby') =>
+      api<{ imported: number; skipped: number }>(`/api/admin/users/import/${kind}`, { body: {} }),
+    onSuccess: (r, kind) => {
+      const label = kind === 'emby' ? 'Emby' : 'Jellyfin';
+      setMessage(`✓ Imported ${r.imported} ${label} user${r.imported === 1 ? '' : 's'} (${r.skipped} already existed)`);
+      refresh();
+    },
+    onError,
+  });
+
   const toggleAdmin = useMutation({
     mutationFn: ({ id, isAdmin }: { id: number; isAdmin: boolean }) =>
       api(`/api/admin/users/${id}`, { method: 'PATCH', body: { isAdmin } }),
@@ -148,13 +159,27 @@ function UsersPanel() {
           <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">
             Users {members ? `(${members.length})` : ''}
           </h2>
-          <button className="btn btn-ghost" disabled={importPlex.isPending} onClick={() => importPlex.mutate()}>
-            {importPlex.isPending ? 'Importing…' : 'Import Plex users'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {settings?.plexTokenSet && (
+              <button className="btn btn-ghost" disabled={importPlex.isPending} onClick={() => importPlex.mutate()}>
+                {importPlex.isPending ? 'Importing…' : 'Import Plex users'}
+              </button>
+            )}
+            {settings?.jellyfinKeySet && (
+              <button className="btn btn-ghost" disabled={importJf.isPending} onClick={() => importJf.mutate('jellyfin')}>
+                {importJf.isPending ? 'Importing…' : 'Import Jellyfin users'}
+              </button>
+            )}
+            {settings?.embyKeySet && (
+              <button className="btn btn-ghost" disabled={importJf.isPending} onClick={() => importJf.mutate('emby')}>
+                {importJf.isPending ? 'Importing…' : 'Import Emby users'}
+              </button>
+            )}
+          </div>
         </div>
         <p className="text-sm text-stone-400">
-          Import pre-creates accounts for your Plex Home members and friends — they sign in with Plex and land in
-          their account automatically.
+          Import pre-creates accounts for the people on your media servers — Plex Home members and friends, or every
+          account on Jellyfin/Emby. They sign in with that server and land in their account automatically.
         </p>
         {message && <p className="text-sm text-stone-300">{message}</p>}
         <ul className="space-y-2">
