@@ -378,6 +378,11 @@ export interface WatchWithPartner {
 
 export type WatchedMethod = 'trakt' | 'plex' | 'sync-account';
 
+// The signed-in person's own Watch With setting.
+export interface WatchWithSettings {
+  available: boolean; // others may pick them as a partner
+}
+
 export interface WatchWithLibraryResult {
   pick: MediaItem;
   poolSize: number;

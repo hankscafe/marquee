@@ -16,6 +16,8 @@ export const users = sqliteTable(
     oidcSub: text('oidc_sub').unique(), // set for OIDC-authenticated accounts (subject claim)
     traktToken: text('trakt_token'), // Trakt OAuth access token, set when the user connects Trakt
     traktRefresh: text('trakt_refresh'),
+    // Whether others may pick this person in Watch With (it reads their watch history).
+    watchWith: integer('watch_with', { mode: 'boolean' }).notNull().default(true),
     isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' })
       .notNull()

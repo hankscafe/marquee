@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
+import type { WatchWithSettings } from '@marquee/shared';
 import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
@@ -13,9 +14,26 @@ import { dedupeColumns, dedupeMedia, fullRow } from '../sources/dedupe.js';
 import { fetchWatchlist, watchedSetForUser, watchlistKey } from '../watchwith/service.js';
 import { serializeMedia } from './media.js';
 
+// Who can be picked as a partner: people who sign in (not public-poll guests or
+// Discord voters) and haven't turned Watch With off for themselves — picking
+// someone reads their watch history and watchlist.
+const pickable = and(isMemberAccount, eq(users.watchWith, true));
+
 export async function watchWithRoutes(app: FastifyInstance) {
-  // Everyone else on the instance who signs in (not public-poll guests or
-  // Discord voters), with what history sources they bring.
+  // Your own setting: whether others may pick you.
+  app.get('/api/watchwith/me', { preHandler: requireUser }, async (request): Promise<WatchWithSettings> => {
+    const me = db.select({ watchWith: users.watchWith }).from(users).where(eq(users.id, request.user!.id)).get();
+    return { available: me?.watchWith ?? true };
+  });
+
+  app.put('/api/watchwith/me', { preHandler: requireUser }, async (request, reply) => {
+    const parsed = z.object({ available: z.boolean() }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
+    db.update(users).set({ watchWith: parsed.data.available }).where(eq(users.id, request.user!.id)).run();
+    return { available: parsed.data.available } satisfies WatchWithSettings;
+  });
+
+  // Everyone else who can be picked, with what history sources they bring.
   app.get('/api/watchwith/partners', { preHandler: requireUser }, async (request) => {
     // Reduce token presence to booleans in SQL so other users' encrypted
     // tokens never enter application memory here.
@@ -27,7 +45,7 @@ export async function watchWithRoutes(app: FastifyInstance) {
         hasTrakt: sql<number>`(${users.traktToken} is not null)`,
       })
       .from(users)
-      .where(and(ne(users.id, request.user!.id), isMemberAccount))
+      .where(and(ne(users.id, request.user!.id), pickable))
       .all()
       .map((u) => ({ id: u.id, username: u.username, hasPlex: !!u.hasPlex, hasTrakt: !!u.hasTrakt }));
   });
@@ -44,7 +62,7 @@ export async function watchWithRoutes(app: FastifyInstance) {
     const partner = db
       .select({ id: users.id })
       .from(users)
-      .where(and(eq(users.id, parsed.data.partnerId), isMemberAccount))
+      .where(and(eq(users.id, parsed.data.partnerId), pickable))
       .get();
     if (!partner) return reply.code(404).send({ error: 'Partner not found' });
 
@@ -83,7 +101,7 @@ export async function watchWithRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
 
     const me = db.select().from(users).where(eq(users.id, request.user!.id)).get();
-    const partner = db.select().from(users).where(and(eq(users.id, parsed.data.partnerId), isMemberAccount)).get();
+    const partner = db.select().from(users).where(and(eq(users.id, parsed.data.partnerId), pickable)).get();
     if (!partner) return reply.code(404).send({ error: 'Partner not found' });
     if (!me?.plexToken) {
       return reply.code(400).send({ error: 'Watchlist mode needs your Plex account — sign in with Plex first' });

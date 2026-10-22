@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `watch_with` integer DEFAULT true NOT NULL;

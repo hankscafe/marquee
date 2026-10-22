@@ -4,8 +4,10 @@ import type {
   WatchedMethod,
   WatchWithLibraryResult,
   WatchWithPartner,
+  WatchWithSettings,
   WatchWithWatchlistResult,
 } from '@marquee/shared';
+import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { MediaFacts } from '../components/MediaDetails';
 import { Poster } from '../components/Poster';
@@ -31,6 +33,10 @@ export function WatchWith() {
   const { data: partners } = useQuery({
     queryKey: ['watchwith-partners'],
     queryFn: () => api<WatchWithPartner[]>('/api/watchwith/partners'),
+  });
+  const { data: me } = useQuery({
+    queryKey: ['watchwith-me'],
+    queryFn: () => api<WatchWithSettings>('/api/watchwith/me'),
   });
 
   const clearResults = () => {
@@ -101,7 +107,18 @@ export function WatchWith() {
             ))}
           </select>
           {partners && partners.length === 0 && (
-            <p className="text-sm text-stone-500">No one else has an account here yet — share the app!</p>
+            <p className="text-sm text-stone-500">
+              No one is available yet — share the app, or ask people to turn Watch With on in their Account page.
+            </p>
+          )}
+          {me && !me.available && (
+            <p className="text-xs text-stone-500">
+              You’ve turned Watch With off for yourself, so others can’t pick you —{' '}
+              <Link to="/account" className="text-neon-300 underline">
+                change that
+              </Link>
+              .
+            </p>
           )}
         </div>
 

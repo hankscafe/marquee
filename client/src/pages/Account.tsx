@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { startRegistration } from '@simplewebauthn/browser';
-import type { PasskeyInfo } from '@marquee/shared';
+import type { PasskeyInfo, WatchWithSettings } from '@marquee/shared';
 import { api, ApiError } from '../api';
 import { useAuth, useLogout } from '../auth';
 
@@ -40,6 +40,16 @@ export function Account() {
   const removePasskey = useMutation({
     mutationFn: (id: number) => api(`/api/passkeys/${id}`, { method: 'DELETE' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['passkeys'] }),
+  });
+
+  const { data: watchWith } = useQuery({
+    queryKey: ['watchwith-me'],
+    queryFn: () => api<WatchWithSettings>('/api/watchwith/me'),
+  });
+  const setWatchWith = useMutation({
+    mutationFn: (available: boolean) =>
+      api<WatchWithSettings>('/api/watchwith/me', { method: 'PUT', body: { available } }),
+    onSuccess: (data) => queryClient.setQueryData(['watchwith-me'], data),
   });
 
   return (
@@ -98,6 +108,27 @@ export function Account() {
           </button>
         </div>
         {message && <p className="text-sm text-stone-300">{message}</p>}
+      </section>
+
+      <section className="card space-y-3 p-5">
+        <h2 className="text-xs font-semibold tracking-widest text-neon-500 uppercase">Watch With</h2>
+        <label className="flex items-start gap-3 text-sm text-stone-300">
+          <input
+            type="checkbox"
+            className="mt-0.5 accent-neon-400"
+            checked={watchWith?.available ?? true}
+            disabled={!watchWith || setWatchWith.isPending}
+            onChange={(e) => setWatchWith.mutate(e.target.checked)}
+          />
+          <span>
+            Let others pick me in Watch With
+            <span className="mt-1 block text-stone-500">
+              Picking you draws from titles you haven’t seen (your Trakt or Plex history) and, in watchlist mode, from
+              your plex.tv watchlist.
+            </span>
+          </span>
+        </label>
+        {setWatchWith.isError && <p className="text-sm text-crimson-500">✗ Couldn’t save that — try again</p>}
       </section>
 
       <div className="card p-5">
