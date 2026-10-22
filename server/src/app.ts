@@ -48,8 +48,41 @@ export async function buildApp() {
   });
 
   await app.register(fastifyHelmet, {
-    contentSecurityPolicy: false, // the SPA sets what it needs; CSP here would break inline Vite assets
+    // Everything the app loads comes from Marquee itself (the Vite build has no
+    // inline scripts or styles), except TMDb's posters on the Collections page.
+    // Only Marquee may frame itself, as X-Frame-Options already said. Requests
+    // aren't upgraded to https: Marquee is often reached over plain http at home.
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https://image.tmdb.org'],
+        fontSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        manifestSrc: ["'self'"],
+        workerSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
+  });
+
+  // Refuse changes requested by another site's page — a vote cast or a setting
+  // changed from a link someone was sent. Browsers say where a request came
+  // from in Sec-Fetch-Site, which a reverse proxy can't distort (unlike Origin
+  // vs Host). Requests without it — the widget, scripts, older browsers — pass;
+  // SameSite cookies still keep sessions off cross-site requests for those.
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') return;
+    const site = request.headers['sec-fetch-site'];
+    if (site === 'cross-site' || site === 'same-site') {
+      return reply.code(403).send({ error: 'Requests from other sites aren’t allowed' });
+    }
   });
   await app.register(fastifyRateLimit, { global: false });
   await app.register(fastifyCookie, { secret: config.sessionSecret });
