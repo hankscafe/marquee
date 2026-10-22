@@ -1,4 +1,5 @@
 import { Cron } from 'croner';
+import { pruneSessions } from './auth/plugin.js';
 import { and, eq, isNotNull, lte } from 'drizzle-orm';
 import { runIntegrityCheck } from './db/health.js';
 import { db } from './db/index.js';
@@ -26,6 +27,13 @@ function dailyIntegrityCheck(now: Date) {
   if (now.getHours() === 4 && now.getMinutes() === 30) runIntegrityCheck();
 }
 
+// Once an hour, clear out sessions that can no longer be used.
+function hourlySessionPrune(now: Date) {
+  if (now.getMinutes() !== 17) return;
+  const pruned = pruneSessions(now);
+  if (pruned) logger.info({ pruned }, 'removed expired sessions');
+}
+
 function closeDuePolls(now: Date) {
   const toClose = db
     .select()
@@ -37,7 +45,8 @@ function closeDuePolls(now: Date) {
 
 // Every minute: open drafts whose opensAt has passed, close open polls whose
 // closesAt has passed, fire any due scheduled randomizer picks, start the
-// automatic library sync when it's due, and check the database once a day. Each step is isolated so one failing
+// automatic library sync when it's due, prune dead sessions hourly and check
+// the database once a day. Each step is isolated so one failing
 // (e.g. SQLITE_BUSY while a backup holds a lock) doesn't skip the others.
 export function startScheduler() {
   const steps: [string, (now: Date) => void][] = [
@@ -46,6 +55,7 @@ export function startScheduler() {
     ['open polls', openDuePolls],
     ['close polls', closeDuePolls],
     ['integrity check', dailyIntegrityCheck],
+    ['session prune', hourlySessionPrune],
   ];
   new Cron(
     '* * * * *',

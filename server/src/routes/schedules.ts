@@ -55,7 +55,7 @@ export async function scheduleRoutes(app: FastifyInstance) {
         name: z.string().min(1, 'Name is required').max(100),
         kind: z.enum(['weekly', 'once']),
         dayOfWeek: z.number().int().min(0).max(6).optional(),
-        timeOfDay: z.string().regex(/^\d{2}:\d{2}$/, 'Time must be HH:MM').optional(),
+        timeOfDay: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Time must be HH:MM').optional(),
         runAt: z.string().optional(),
         filters: randomFiltersSchema.default({}),
         postToDiscord: z.boolean().default(true),
@@ -117,7 +117,7 @@ export async function scheduleRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const row = ownSchedule(Number((request.params as { id: string }).id), request.user!.id, request.user!.isAdmin);
       if (!row) return reply.code(404).send({ error: 'Schedule not found' });
-      const pick = await runSchedule(row);
+      const pick = await runSchedule(row, { manual: true });
       if (!pick) return reply.code(404).send({ error: 'No titles match this schedule’s filters' });
       return serializeMedia(pick);
     },

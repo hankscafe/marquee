@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { logger } from '../logger.js';
 import { media, tmdbCollectionParts, tmdbCollections } from '../db/schema.js';
@@ -101,7 +101,21 @@ async function runScan(key: string, pending: { id: number; tmdbId: string | null
     const all = db.select().from(tmdbCollections).all();
     state.franchisesFound = all.length;
     for (const col of all) {
-      const parts = await getCollectionParts(col.tmdbId, key);
+      let parts;
+      try {
+        parts = await getCollectionParts(col.tmdbId, key);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('API key')) throw err;
+        if (message.includes('(404)')) {
+          // TMDb removed or merged this collection: drop it (its parts cascade).
+          db.delete(tmdbCollections).where(eq(tmdbCollections.id, col.id)).run();
+        } else {
+          state.errors++;
+          state.lastError = message;
+        }
+        continue;
+      }
       db.transaction((tx) => {
         tx.delete(tmdbCollectionParts).where(eq(tmdbCollectionParts.collectionId, col.id)).run();
         for (const p of parts) {
@@ -118,6 +132,8 @@ async function runScan(key: string, pending: { id: number; tmdbId: string | null
         }
       });
     }
+    // Less any that TMDb no longer has.
+    state.franchisesFound = db.select({ n: sql<number>`count(*)` }).from(tmdbCollections).get()!.n;
   } catch (err) {
     state.lastError = err instanceof Error ? err.message : String(err);
     logger.error({ err: state.lastError }, 'franchise scan failed');

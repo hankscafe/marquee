@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import type { WidgetPoll, WidgetPollsResponse } from '@marquee/shared';
 import { db } from '../db/index.js';
 import { polls } from '../db/schema.js';
@@ -64,7 +64,12 @@ export async function widgetRoutes(app: FastifyInstance) {
     const query = request.query as { spotlight?: string; only?: string };
     const spotlightOnly = query.spotlight === '1' || query.spotlight === 'true' || query.only === 'spotlight';
 
-    const spotRow = db.select().from(polls).where(eq(polls.spotlight, true)).get();
+    // A spotlighted draft stays private, like every other draft.
+    const spotRow = db
+      .select()
+      .from(polls)
+      .where(and(eq(polls.spotlight, true), ne(polls.status, 'draft')))
+      .get();
     if (spotlightOnly) {
       const spotlight = spotRow ? serializeWidgetPoll(spotRow, optionsWithVotes([spotRow.id]).get(spotRow.id)!, appUrl) : null;
       return { generatedAt: new Date().toISOString(), spotlight } satisfies WidgetPollsResponse;

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
-import { and, eq, gt } from 'drizzle-orm';
+import { and, eq, gt, inArray, lt, lte, notInArray, or } from 'drizzle-orm';
 import { config } from '../config.js';
 import { db } from '../db/index.js';
 import { sessions, users } from '../db/schema.js';
@@ -27,6 +27,24 @@ const LAST_SEEN_THROTTLE_MS = 60 * 1000;
 // Idle window for a session, in minutes, based on the account's role.
 export function idleMinutes(isAdmin: boolean): number {
   return isAdmin ? config.adminIdleMinutes : config.userIdleMinutes;
+}
+
+// Sessions past their 30-day cap, or idle longer than their account's role
+// allows, can never be used again — but the auth hook only notices one when its
+// cookie comes back. Run periodically so they don't pile up.
+export function pruneSessions(now = new Date()): number {
+  const idleSince = (isAdmin: boolean) => new Date(now.getTime() - idleMinutes(isAdmin) * 60_000);
+  const admins = db.select({ id: users.id }).from(users).where(eq(users.isAdmin, true));
+  return db
+    .delete(sessions)
+    .where(
+      or(
+        lte(sessions.expiresAt, now),
+        and(inArray(sessions.userId, admins), lt(sessions.lastSeenAt, idleSince(true))),
+        and(notInArray(sessions.userId, admins), lt(sessions.lastSeenAt, idleSince(false))),
+      ),
+    )
+    .run().changes;
 }
 
 export async function createSession(reply: FastifyReply, userId: number) {

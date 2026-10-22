@@ -83,6 +83,7 @@ export async function adminUserRoutes(app: FastifyInstance) {
       })
       .safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
+    if (parsed.data.isAdmin === undefined && !parsed.data.password) return reply.code(400).send({ error: 'Nothing to change' });
     const user = db.select().from(users).where(eq(users.id, id)).get();
     if (!user) return reply.code(404).send({ error: 'User not found' });
     if (user.id === request.user!.id && parsed.data.isAdmin === false) {

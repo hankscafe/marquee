@@ -38,7 +38,17 @@ export function getDiscordStatus() {
   };
 }
 
-export async function startDiscordBot(): Promise<void> {
+// Starts and restarts (after a token change) run one at a time: overlapping
+// calls — boot, an admin saving the token, a connection test — would otherwise
+// each log in a client, leaving two that both answer every button press.
+let starting: Promise<void> = Promise.resolve();
+
+export function startDiscordBot(): Promise<void> {
+  starting = starting.then(connect, connect);
+  return starting;
+}
+
+async function connect(): Promise<void> {
   if (client) {
     await client.destroy().catch(() => {});
     client = null;

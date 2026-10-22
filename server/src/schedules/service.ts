@@ -15,9 +15,13 @@ export function parseFilters(row: ScheduleRow): RandomFilters {
   }
 }
 
-// Execute one schedule: draw a pick, record it, one-shots disable themselves,
-// and optionally announce on Discord.
-export async function runSchedule(row: ScheduleRow): Promise<typeof media.$inferSelect | null> {
+// Execute one schedule: draw a pick, record it, and optionally announce on
+// Discord. A one-shot disables itself once it fires on time; "Run now" is a
+// preview and leaves it waiting for its date.
+export async function runSchedule(
+  row: ScheduleRow,
+  { manual = false }: { manual?: boolean } = {},
+): Promise<typeof media.$inferSelect | null> {
   // An unattended schedule draws only from lists its creator personally owns
   // or that are shared — never via admin override in a background job.
   const pick = await pickRandomMedia(parseFilters(row), { id: row.createdBy, isAdmin: false });
@@ -25,7 +29,7 @@ export async function runSchedule(row: ScheduleRow): Promise<typeof media.$infer
     .set({
       lastRunAt: new Date(),
       lastPickMediaId: pick?.id ?? null,
-      ...(row.kind === 'once' ? { enabled: false } : {}),
+      ...(row.kind === 'once' && !manual ? { enabled: false } : {}),
     })
     .where(eq(scheduledPicks.id, row.id))
     .run();

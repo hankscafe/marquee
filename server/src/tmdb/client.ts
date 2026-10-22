@@ -4,7 +4,8 @@ import { getSetting } from '../settings.js';
 // so the Collections page can show titles missing from the library.
 // The admin gets a free API key at https://www.themoviedb.org/settings/api.
 
-const TMDB = 'https://api.themoviedb.org/3';
+// Overridable so tests can point the scan at a fake TMDb.
+const TMDB = process.env.TMDB_API_URL ?? 'https://api.themoviedb.org/3';
 
 export function getTmdbKey(): string | null {
   return getSetting('tmdb.apiKey');

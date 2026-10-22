@@ -82,6 +82,9 @@ export async function listRoutes(app: FastifyInstance) {
       .object({ name: z.string().min(1).max(100).optional(), isShared: z.boolean().optional() })
       .safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid request' });
+    if (parsed.data.name === undefined && parsed.data.isShared === undefined) {
+      return reply.code(400).send({ error: 'Nothing to change' });
+    }
     db.update(lists).set(parsed.data).where(eq(lists.id, list.id)).run();
     return serializeList(listById(list.id)!, request.user!.id);
   });
